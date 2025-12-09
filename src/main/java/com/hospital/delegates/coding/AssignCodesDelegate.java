@@ -6,8 +6,11 @@ import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.camunda.bpm.dmn.engine.DmnDecisionTableResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import com.hospital.delegates.coding.exceptions.CodingException;
+
+import jakarta.inject.Named;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -34,6 +37,8 @@ import java.util.stream.Collectors;
  * @author Revenue Cycle System
  * @version 2.0.0
  */
+@Component
+@Named("assignCodesDelegate")
 public class AssignCodesDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AssignCodesDelegate.class);
@@ -445,7 +450,7 @@ public class AssignCodesDelegate implements JavaDelegate {
         execution.setVariable("tussCodes",
             suggestions.tussCodes.stream().map(c -> c.code).collect(Collectors.toList()));
         execution.setVariable("cbhpmCodes",
-            suggestions.tussCodes.stream().map(c -> c.code).collect(Collectors.toList()));
+            suggestions.cbhpmCodes.stream().map(c -> c.code).collect(Collectors.toList())); // FIX: Use cbhpmCodes not tussCodes
 
         // Primary codes
         execution.setVariable("primaryDiagnosisCode", suggestions.primaryDiagnosisCode);

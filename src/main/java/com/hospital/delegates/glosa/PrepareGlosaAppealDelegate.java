@@ -4,12 +4,23 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Delegate to prepare glosa appeal documentation and submission
+ * Delegate to prepare glosa appeal documentation and submission.
+ *
+ * This delegate compiles required documentation, generates appeal packages,
+ * and prepares submissions according to payer-specific requirements.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("prepareGlosaAppealDelegate")
 public class PrepareGlosaAppealDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PrepareGlosaAppealDelegate.class);

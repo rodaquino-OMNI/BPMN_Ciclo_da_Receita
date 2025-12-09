@@ -4,10 +4,21 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 
 /**
- * Delegate to send payment reminder to patient
+ * Delegate to send payment reminder to patient.
+ *
+ * This delegate manages patient communication for outstanding balances,
+ * supporting multiple contact methods (email, SMS, mail) and tracking reminder frequency.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("sendPaymentReminderDelegate")
 public class SendPaymentReminderDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SendPaymentReminderDelegate.class);

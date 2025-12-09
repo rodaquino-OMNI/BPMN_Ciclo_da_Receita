@@ -4,12 +4,23 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Delegate to identify glosas (claim denials/rejections) from payer response
+ * Delegate to identify glosas (claim denials/rejections) from payer response.
+ *
+ * This delegate analyzes remittance advice (ERA/835) to detect claim denials,
+ * categorizes glosa types, and determines appeal eligibility.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("identifyGlosaDelegate")
 public class IdentifyGlosaDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(IdentifyGlosaDelegate.class);
@@ -24,6 +35,13 @@ public class IdentifyGlosaDelegate implements JavaDelegate {
             String claimId = (String) execution.getVariable("claimId");
             String remittanceAdvice = (String) execution.getVariable("remittanceAdvice");
             Object denialCodes = execution.getVariable("denialCodes");
+
+            // Input validation - CRITICAL for data integrity
+            if (claimId == null || claimId.trim().isEmpty()) {
+                String errorMsg = "Claim ID is required for glosa analysis";
+                LOGGER.error(errorMsg);
+                throw new IllegalArgumentException(errorMsg);
+            }
 
             LOGGER.debug("Analyzing glosas - Claim: {}", claimId);
 

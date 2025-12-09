@@ -5,7 +5,9 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
+import jakarta.inject.Named;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -44,6 +46,8 @@ import java.util.regex.Pattern;
  * @author Hospital Revenue Cycle Team
  * @version 1.0
  */
+@Component
+@Named("verifyPatientEligibilityDelegate")
 public class VerifyPatientEligibilityDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(VerifyPatientEligibilityDelegate.class);
@@ -191,6 +195,7 @@ public class VerifyPatientEligibilityDelegate implements JavaDelegate {
         // Transaction: TISS Verificação de Elegibilidade (TISS Standard)
 
         EligibilityResponse response = new EligibilityResponse();
+        response.checkDateTime = LocalDateTime.now(); // Initialize to prevent NPE
 
         // Build TISS eligibility request
         Map<String, Object> tissRequest = new HashMap<>();
@@ -230,6 +235,7 @@ public class VerifyPatientEligibilityDelegate implements JavaDelegate {
         // HL7 FHIR Coverage and CoverageEligibilityRequest resources
 
         EligibilityResponse response = new EligibilityResponse();
+        response.checkDateTime = LocalDateTime.now(); // Initialize to prevent NPE
 
         // Build FHIR CoverageEligibilityRequest
         Map<String, Object> fhirRequest = new HashMap<>();
@@ -277,6 +283,7 @@ public class VerifyPatientEligibilityDelegate implements JavaDelegate {
         // Custom provider-specific API integration
 
         EligibilityResponse response = new EligibilityResponse();
+        response.checkDateTime = LocalDateTime.now(); // Initialize to prevent NPE
 
         // Build REST request
         Map<String, Object> apiRequest = new HashMap<>();

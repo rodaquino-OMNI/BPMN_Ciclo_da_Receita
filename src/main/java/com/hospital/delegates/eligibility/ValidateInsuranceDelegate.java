@@ -4,12 +4,23 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 /**
- * Delegate to validate insurance policy status and expiration
+ * Delegate to validate insurance policy status and expiration.
+ *
+ * This delegate verifies that insurance policies are active and not expired,
+ * ensuring claims can be processed without rejection.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("validateInsuranceDelegate")
 public class ValidateInsuranceDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ValidateInsuranceDelegate.class);

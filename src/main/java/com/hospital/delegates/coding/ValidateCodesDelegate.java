@@ -4,12 +4,23 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Delegate to validate medical codes for accuracy and compliance
+ * Delegate to validate medical codes for accuracy and compliance.
+ *
+ * This delegate performs comprehensive validation of ICD-10, CPT/TUSS codes
+ * ensuring they meet regulatory compliance and payer requirements.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("validateCodesDelegate")
 public class ValidateCodesDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ValidateCodesDelegate.class);
@@ -24,13 +35,13 @@ public class ValidateCodesDelegate implements JavaDelegate {
             @SuppressWarnings("unchecked")
             List<String> icd10Codes = (List<String>) execution.getVariable("icd10Codes");
             @SuppressWarnings("unchecked")
-            List<String> cptCodes = (List<String>) execution.getVariable("cptCodes");
+            List<String> tussCodes = (List<String>) execution.getVariable("tussCodes"); // FIX: Brazilian standard uses TUSS not CPT
             String primaryDiagnosisCode = (String) execution.getVariable("primaryDiagnosisCode");
 
-            LOGGER.debug("Validating codes - ICD-10: {}, CPT: {}", icd10Codes, cptCodes);
+            LOGGER.debug("Validating codes - ICD-10: {}, TUSS: {}", icd10Codes, tussCodes);
 
             // Validate codes
-            ValidationResult validation = validateCodes(icd10Codes, cptCodes, primaryDiagnosisCode);
+            ValidationResult validation = validateCodes(icd10Codes, tussCodes, primaryDiagnosisCode);
 
             // Set output variables
             execution.setVariable("codesValid", validation.isValid);

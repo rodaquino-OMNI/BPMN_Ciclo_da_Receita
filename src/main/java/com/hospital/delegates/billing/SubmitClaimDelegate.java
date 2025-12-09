@@ -4,10 +4,21 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 
 /**
- * Delegate to submit insurance claim to payer
+ * Delegate to submit insurance claim to payer.
+ *
+ * This delegate handles the electronic submission of insurance claims to payer systems
+ * using EDI 837 format or proprietary API integrations.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("submitClaimDelegate")
 public class SubmitClaimDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SubmitClaimDelegate.class);
@@ -23,6 +34,17 @@ public class SubmitClaimDelegate implements JavaDelegate {
             String claimNumber = (String) execution.getVariable("claimNumber");
             String insuranceProvider = (String) execution.getVariable("insuranceProvider");
             String submissionMethod = (String) execution.getVariable("submissionMethod");
+
+            // Input validation - CRITICAL for claim submission integrity
+            if (claimId == null || claimId.trim().isEmpty()) {
+                throw new IllegalArgumentException("Claim ID is required for submission");
+            }
+            if (claimNumber == null || claimNumber.trim().isEmpty()) {
+                throw new IllegalArgumentException("Claim number is required for submission");
+            }
+            if (insuranceProvider == null || insuranceProvider.trim().isEmpty()) {
+                throw new IllegalArgumentException("Insurance provider is required for submission");
+            }
 
             LOGGER.debug("Submitting claim - Claim: {}, Provider: {}, Method: {}",
                 claimNumber, insuranceProvider, submissionMethod);

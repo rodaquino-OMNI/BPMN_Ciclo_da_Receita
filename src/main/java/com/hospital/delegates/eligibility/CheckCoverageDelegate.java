@@ -4,10 +4,21 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 
 /**
- * Delegate to check insurance coverage details for procedures
+ * Delegate to check insurance coverage details for procedures.
+ *
+ * This delegate calculates coverage percentages, patient responsibility,
+ * and pre-authorization requirements based on insurance plan rules.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("checkCoverageDelegate")
 public class CheckCoverageDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CheckCoverageDelegate.class);

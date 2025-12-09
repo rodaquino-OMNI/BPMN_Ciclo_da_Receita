@@ -4,10 +4,21 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 
 /**
- * Delegate to initiate patient payment collection process
+ * Delegate to initiate patient payment collection process.
+ *
+ * This delegate creates collection cases for outstanding patient balances,
+ * determines priority levels, and schedules first contact dates.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("initiateCollectionDelegate")
 public class InitiateCollectionDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(InitiateCollectionDelegate.class);

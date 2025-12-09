@@ -4,12 +4,23 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Delegate to analyze glosa details and determine resolution strategy
+ * Delegate to analyze glosa details and determine resolution strategy.
+ *
+ * This delegate evaluates claim denials and determines the optimal resolution approach,
+ * including appeal strategies, required documentation, and recovery potential.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("analyzeGlosaDelegate")
 public class AnalyzeGlosaDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AnalyzeGlosaDelegate.class);

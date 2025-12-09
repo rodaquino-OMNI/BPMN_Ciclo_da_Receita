@@ -4,10 +4,21 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import jakarta.inject.Named;
 
 /**
- * Delegate to process insurance payment and patient balance
+ * Delegate to process insurance payment and patient balance.
+ *
+ * This delegate handles the reconciliation of insurance payments with claims,
+ * calculates patient responsibility, and determines if additional patient billing is required.
+ *
+ * @author Hospital Revenue Cycle Team
+ * @version 1.0.0
  */
+@Component
+@Named("processPaymentDelegate")
 public class ProcessPaymentDelegate implements JavaDelegate {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ProcessPaymentDelegate.class);

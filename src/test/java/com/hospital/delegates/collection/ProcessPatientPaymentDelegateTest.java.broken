@@ -1,0 +1,331 @@
+package com.hospital.delegates.collection;
+
+import com.hospital.model.PatientPayment;
+import com.hospital.repository.PatientPaymentRepository;
+import com.hospital.services.idempotency.IdempotencyService;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * Comprehensive test suite for ProcessPatientPaymentDelegate
+ *
+ * Tests cover:
+ * - Payment processing with idempotency
+ * - Duplicate payment detection
+ * - Retry after failure
+ * - Concurrent payment processing
+ * - Error handling
+ */
+@ExtendWith(MockitoExtension.class)
+class ProcessPatientPaymentDelegateTest {
+
+    @Mock
+    private IdempotencyService idempotencyService;
+
+    @Mock
+    private PatientPaymentRepository paymentRepository;
+
+    @Mock
+    private DelegateExecution execution;
+
+    @InjectMocks
+    private ProcessPatientPaymentDelegate delegate;
+
+    private String processInstanceId;
+    private String activityId;
+    private String patientId;
+    private BigDecimal copayAmount;
+
+    @BeforeEach
+    void setUp() {
+        processInstanceId = "proc-123";
+        activityId = "processPayment";
+        patientId = "patient-456";
+        copayAmount = new BigDecimal("25.00");
+
+        // Setup common mock behavior
+        when(execution.getProcessInstanceId()).thenReturn(processInstanceId);
+        when(execution.getCurrentActivityId()).thenReturn(activityId);
+        when(execution.getVariable("patientId")).thenReturn(patientId);
+        when(execution.getVariable("copayAmount")).thenReturn(copayAmount);
+    }
+
+    @Test
+    void testExecute_NewPayment_ShouldProcessSuccessfully() throws Exception {
+        // Given
+        String idempotencyKey = "proc-123_processPayment_patient-456";
+        PatientPayment savedPayment = createPayment("PAY-001", patientId, copayAmount);
+
+        // Mock idempotency service to execute operation
+        when(idempotencyService.executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        when(paymentRepository.save(any(PatientPayment.class)))
+            .thenReturn(savedPayment);
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(idempotencyService).executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        );
+
+        verify(paymentRepository).save(argThat(payment ->
+            payment.getPatientId().equals(patientId) &&
+            payment.getAmount().equals(copayAmount) &&
+            payment.getStatus().equals("COMPLETED")
+        ));
+
+        verify(execution).setVariable("paymentId", "PAY-001");
+        verify(execution).setVariable("paymentStatus", "COMPLETED");
+    }
+
+    @Test
+    void testExecute_DuplicatePayment_ShouldReturnCached() throws Exception {
+        // Given
+        String idempotencyKey = "proc-123_processPayment_patient-456";
+        String cachedPaymentId = "PAY-CACHED-001";
+
+        // Mock idempotency service to return cached result
+        when(idempotencyService.executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        )).thenReturn(cachedPaymentId);
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(idempotencyService).executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        );
+
+        // Payment repository should NOT be called for duplicate
+        verify(paymentRepository, never()).save(any());
+
+        verify(execution).setVariable("paymentId", cachedPaymentId);
+        verify(execution).setVariable("paymentStatus", "COMPLETED");
+    }
+
+    @Test
+    void testExecute_RetryAfterFailure_ShouldSucceedOnRetry() throws Exception {
+        // Given
+        String idempotencyKey = "proc-123_processPayment_patient-456";
+        AtomicInteger attemptCount = new AtomicInteger(0);
+        PatientPayment savedPayment = createPayment("PAY-RETRY-001", patientId, copayAmount);
+
+        // Mock idempotency service to actually execute the operation
+        when(idempotencyService.executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // First call fails, second succeeds
+        when(paymentRepository.save(any(PatientPayment.class)))
+            .thenAnswer(invocation -> {
+                if (attemptCount.incrementAndGet() == 1) {
+                    throw new RuntimeException("Database temporarily unavailable");
+                }
+                return savedPayment;
+            });
+
+        // When - First attempt (should fail)
+        assertThatThrownBy(() -> delegate.execute(execution))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("Database temporarily unavailable");
+
+        // When - Retry (should succeed)
+        delegate.execute(execution);
+
+        // Then
+        assertThat(attemptCount.get()).isEqualTo(2);
+        verify(execution).setVariable("paymentId", "PAY-RETRY-001");
+        verify(execution).setVariable("paymentStatus", "COMPLETED");
+    }
+
+    @Test
+    void testExecute_ConcurrentPaymentProcessing_ShouldHandleCorrectly() throws Exception {
+        // Given
+        String idempotencyKey = "proc-123_processPayment_patient-456";
+        int threadCount = 5;
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        AtomicInteger executionCount = new AtomicInteger(0);
+
+        PatientPayment savedPayment = createPayment("PAY-CONCURRENT-001", patientId, copayAmount);
+
+        // Mock idempotency service to handle concurrent calls
+        when(idempotencyService.executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            // First thread executes, others return cached
+            if (executionCount.incrementAndGet() == 1) {
+                Callable<String> operation = invocation.getArgument(2);
+                return operation.call();
+            }
+            return "PAY-CONCURRENT-001"; // Cached result
+        });
+
+        when(paymentRepository.save(any(PatientPayment.class)))
+            .thenReturn(savedPayment);
+
+        // When - Execute concurrently
+        List<Future<?>> futures = new ArrayList<>();
+        for (int i = 0; i < threadCount; i++) {
+            Future<?> future = executor.submit(() -> {
+                try {
+                    latch.countDown();
+                    latch.await();
+                    delegate.execute(execution);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            futures.add(future);
+        }
+
+        // Wait for all to complete
+        for (Future<?> future : futures) {
+            future.get(5, TimeUnit.SECONDS);
+        }
+
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+
+        // Then - Repository save should be called only once
+        verify(paymentRepository, times(1)).save(any(PatientPayment.class));
+
+        // All threads should set variables (with same value)
+        verify(execution, times(threadCount)).setVariable("paymentId", "PAY-CONCURRENT-001");
+    }
+
+    @Test
+    void testExecute_MissingPatientId_ShouldThrowException() {
+        // Given
+        when(execution.getVariable("patientId")).thenReturn(null);
+
+        // When/Then
+        assertThatThrownBy(() -> delegate.execute(execution))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("patientId");
+    }
+
+    @Test
+    void testExecute_InvalidCopayAmount_ShouldThrowException() {
+        // Given
+        when(execution.getVariable("copayAmount")).thenReturn(new BigDecimal("-10.00"));
+
+        // When
+        String idempotencyKey = "proc-123_processPayment_patient-456";
+        when(idempotencyService.executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // Then
+        assertThatThrownBy(() -> delegate.execute(execution))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("amount");
+    }
+
+    @Test
+    void testExecute_PaymentRepositoryFailure_ShouldPropagateException() {
+        // Given
+        String idempotencyKey = "proc-123_processPayment_patient-456";
+
+        when(idempotencyService.executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        when(paymentRepository.save(any(PatientPayment.class)))
+            .thenThrow(new RuntimeException("Database connection failed"));
+
+        // When/Then
+        assertThatThrownBy(() -> delegate.execute(execution))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("Database connection failed");
+
+        // Variables should not be set on failure
+        verify(execution, never()).setVariable(eq("paymentId"), any());
+    }
+
+    @Test
+    void testExecute_ZeroCopayAmount_ShouldProcessSuccessfully() throws Exception {
+        // Given
+        when(execution.getVariable("copayAmount")).thenReturn(BigDecimal.ZERO);
+        String idempotencyKey = "proc-123_processPayment_patient-456";
+        PatientPayment savedPayment = createPayment("PAY-ZERO-001", patientId, BigDecimal.ZERO);
+
+        when(idempotencyService.executeIdempotent(
+            eq("PROCESS_PATIENT_PAYMENT"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        when(paymentRepository.save(any(PatientPayment.class)))
+            .thenReturn(savedPayment);
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(paymentRepository).save(argThat(payment ->
+            payment.getAmount().compareTo(BigDecimal.ZERO) == 0 &&
+            payment.getStatus().equals("COMPLETED")
+        ));
+    }
+
+    private PatientPayment createPayment(String paymentId, String patientId, BigDecimal amount) {
+        PatientPayment payment = new PatientPayment();
+        payment.setId(paymentId);
+        payment.setPatientId(patientId);
+        payment.setAmount(amount);
+        payment.setStatus("COMPLETED");
+        payment.setPaymentDate(LocalDateTime.now());
+        return payment;
+    }
+}

@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
+             id="billing-calculation-dmn"
+             name="Billing Calculation Rules"
+             namespace="http://camunda.org/schema/1.0/dmn">
+
+  <decision id="calculateBilling" name="Calculate Billing Amount" camunda:historyTimeToLive="P180D">
+    <decisionTable id="billingCalculationTable" hitPolicy="FIRST">
+      <input id="input1" label="Payer Type">
+        <inputExpression id="inputExpression1" typeRef="string">
+          <text>payerType</text>
+        </inputExpression>
+      </input>
+      <input id="input2" label="Service Type">
+        <inputExpression id="inputExpression2" typeRef="string">
+          <text>serviceType</text>
+        </inputExpression>
+      </input>
+      <input id="input3" label="Base Amount">
+        <inputExpression id="inputExpression3" typeRef="number">
+          <text>baseAmount</text>
+        </inputExpression>
+      </input>
+      <input id="input4" label="Co-participation">
+        <inputExpression id="inputExpression4" typeRef="number">
+          <text>coParticipationPercent</text>
+        </inputExpression>
+      </input>
+      <input id="input5" label="Discount Applied">
+        <inputExpression id="inputExpression5" typeRef="boolean">
+          <text>discountApplied</text>
+        </inputExpression>
+      </input>
+
+      <output id="output1" label="Insurance Amount" name="insuranceAmount" typeRef="number" />
+      <output id="output2" label="Patient Amount" name="patientAmount" typeRef="number" />
+      <output id="output3" label="Tax Rate" name="taxRate" typeRef="number" />
+      <output id="output4" label="Billing Type" name="billingType" typeRef="string" />
+
+      <!-- Rule 1: Private insurance, inpatient, with co-participation -->
+      <rule id="rule1">
+        <inputEntry id="inputEntry1_1">
+          <text>"PRIVATE_INSURANCE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_2">
+          <text>"INPATIENT"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_4">
+          <text>&gt; 0</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_5">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry1_1">
+          <text>baseAmount * (1 - coParticipationPercent / 100)</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_2">
+          <text>baseAmount * (coParticipationPercent / 100)</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_4">
+          <text>"SPLIT_BILLING"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 2: Private insurance, outpatient, no co-participation -->
+      <rule id="rule2">
+        <inputEntry id="inputEntry2_1">
+          <text>"PRIVATE_INSURANCE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_2">
+          <text>"OUTPATIENT"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_4">
+          <text>0</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry2_1">
+          <text>baseAmount</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_2">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_4">
+          <text>"INSURANCE_ONLY"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 3: SUS (public healthcare) -->
+      <rule id="rule3">
+        <inputEntry id="inputEntry3_1">
+          <text>"SUS"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry3_1">
+          <text>baseAmount</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_2">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_4">
+          <text>"PUBLIC_HEALTHCARE"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 4: Private pay, with discount -->
+      <rule id="rule4">
+        <inputEntry id="inputEntry4_1">
+          <text>"PRIVATE_PAY"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_5">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="outputEntry4_1">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_2">
+          <text>baseAmount * 0.85</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_4">
+          <text>"PRIVATE_PAY_DISCOUNTED"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 5: Private pay, no discount -->
+      <rule id="rule5">
+        <inputEntry id="inputEntry5_1">
+          <text>"PRIVATE_PAY"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_5">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry5_1">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_2">
+          <text>baseAmount</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_4">
+          <text>"PRIVATE_PAY_FULL"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 6: Corporate insurance, special agreement -->
+      <rule id="rule6">
+        <inputEntry id="inputEntry6_1">
+          <text>"CORPORATE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry6_1">
+          <text>baseAmount * 0.90</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_2">
+          <text>baseAmount * 0.10</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_4">
+          <text>"CORPORATE_AGREEMENT"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 7: Private insurance, emergency, waive co-participation -->
+      <rule id="rule7">
+        <inputEntry id="inputEntry7_1">
+          <text>"PRIVATE_INSURANCE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_2">
+          <text>"EMERGENCY"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_4">
+          <text>&gt; 0</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry7_1">
+          <text>baseAmount</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_2">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_4">
+          <text>"EMERGENCY_FULL_COVERAGE"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 8: Bundle pricing for surgical packages -->
+      <rule id="rule8">
+        <inputEntry id="inputEntry8_1">
+          <text>"PRIVATE_INSURANCE","CORPORATE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_2">
+          <text>"SURGICAL_PACKAGE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_3">
+          <text>&gt; 10000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_5">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="outputEntry8_1">
+          <text>baseAmount * 0.75</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_2">
+          <text>baseAmount * 0.25</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_3">
+          <text>5.0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_4">
+          <text>"BUNDLED_PACKAGE_DISCOUNT"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 9: International patient pricing -->
+      <rule id="rule9">
+        <inputEntry id="inputEntry9_1">
+          <text>"INTERNATIONAL"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry9_1">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry9_2">
+          <text>baseAmount * 1.30</text>
+        </outputEntry>
+        <outputEntry id="outputEntry9_3">
+          <text>10.5</text>
+        </outputEntry>
+        <outputEntry id="outputEntry9_4">
+          <text>"INTERNATIONAL_RATE"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 10: Charity care - full waiver -->
+      <rule id="rule10">
+        <inputEntry id="inputEntry10_1">
+          <text>"CHARITY_CARE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry10_1">
+          <text>baseAmount</text>
+        </outputEntry>
+        <outputEntry id="outputEntry10_2">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry10_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry10_4">
+          <text>"CHARITY_WRITE_OFF"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 11: Medicare/Medicaid equivalent -->
+      <rule id="rule11">
+        <inputEntry id="inputEntry11_1">
+          <text>"GOVERNMENT_PROGRAM"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry11_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry11_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry11_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry11_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry11_1">
+          <text>baseAmount * 0.60</text>
+        </outputEntry>
+        <outputEntry id="outputEntry11_2">
+          <text>baseAmount * 0.40</text>
+        </outputEntry>
+        <outputEntry id="outputEntry11_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry11_4">
+          <text>"GOVERNMENT_RATE"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 12: Workers compensation -->
+      <rule id="rule12">
+        <inputEntry id="inputEntry12_1">
+          <text>"WORKERS_COMP"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry12_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry12_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry12_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry12_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry12_1">
+          <text>baseAmount * 1.20</text>
+        </outputEntry>
+        <outputEntry id="outputEntry12_2">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry12_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry12_4">
+          <text>"WORKERS_COMP_RATE"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 13: High-value discount for private pay -->
+      <rule id="rule13">
+        <inputEntry id="inputEntry13_1">
+          <text>"PRIVATE_PAY"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry13_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry13_3">
+          <text>&gt; 50000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry13_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry13_5">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="outputEntry13_1">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry13_2">
+          <text>baseAmount * 0.70</text>
+        </outputEntry>
+        <outputEntry id="outputEntry13_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry13_4">
+          <text>"HIGH_VALUE_DISCOUNT"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 14: Co-insurance model -->
+      <rule id="rule14">
+        <inputEntry id="inputEntry14_1">
+          <text>"CO_INSURANCE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry14_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry14_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry14_4">
+          <text>[20..30]</text>
+        </inputEntry>
+        <inputEntry id="inputEntry14_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry14_1">
+          <text>baseAmount * ((100 - coParticipationPercent) / 100)</text>
+        </outputEntry>
+        <outputEntry id="outputEntry14_2">
+          <text>baseAmount * (coParticipationPercent / 100)</text>
+        </outputEntry>
+        <outputEntry id="outputEntry14_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry14_4">
+          <text>"CO_INSURANCE_SPLIT"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 15: Capitation payment -->
+      <rule id="rule15">
+        <inputEntry id="inputEntry15_1">
+          <text>"CAPITATION"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry15_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry15_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry15_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry15_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry15_1">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry15_2">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry15_3">
+          <text>0</text>
+        </outputEntry>
+        <outputEntry id="outputEntry15_4">
+          <text>"CAPITATION_COVERED"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

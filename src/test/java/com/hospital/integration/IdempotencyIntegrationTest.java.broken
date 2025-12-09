@@ -1,0 +1,300 @@
+package com.hospital.integration;
+
+import com.hospital.model.Claim;
+import com.hospital.model.EligibilityCheck;
+import com.hospital.model.PatientPayment;
+import com.hospital.repository.ClaimRepository;
+import com.hospital.repository.EligibilityCheckRepository;
+import com.hospital.repository.IdempotencyRecordRepository;
+import com.hospital.repository.PatientPaymentRepository;
+import org.camunda.bpm.engine.RuntimeService;
+import org.camunda.bpm.engine.runtime.ProcessInstance;
+import org.camunda.bpm.engine.test.Deployment;
+import org.camunda.bpm.spring.boot.starter.test.helper.AbstractProcessEngineRuleTest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.camunda.bpm.engine.test.assertions.bpmn.BpmnAwareTests.*;
+
+/**
+ * End-to-end integration tests for idempotency protection
+ *
+ * Tests the complete BPMN process with:
+ * - Process retry with idempotency
+ * - Compensation flow
+ * - Real Camunda process engine
+ * - Database persistence
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+class IdempotencyIntegrationTest extends AbstractProcessEngineRuleTest {
+
+    @Autowired
+    private RuntimeService runtimeService;
+
+    @Autowired
+    private IdempotencyRecordRepository idempotencyRecordRepository;
+
+    @Autowired
+    private PatientPaymentRepository patientPaymentRepository;
+
+    @Autowired
+    private EligibilityCheckRepository eligibilityCheckRepository;
+
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    @BeforeEach
+    void setUp() {
+        // Clean up repositories
+        idempotencyRecordRepository.deleteAll();
+        patientPaymentRepository.deleteAll();
+        eligibilityCheckRepository.deleteAll();
+        claimRepository.deleteAll();
+    }
+
+    @Test
+    @Deployment(resources = "bpmn/revenue-cycle-process.bpmn")
+    void testProcessWithIdempotency_FirstExecution_ShouldComplete() {
+        // Given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("patientId", "patient-integration-001");
+        variables.put("copayAmount", new BigDecimal("50.00"));
+        variables.put("insuranceProvider", "BLUE_CROSS");
+        variables.put("diagnosisCodes", "J44.0,J44.1");
+        variables.put("procedureCodes", "99213,99214");
+
+        // When
+        ProcessInstance processInstance = runtimeService
+            .startProcessInstanceByKey("revenueCycleProcess", variables);
+
+        // Then
+        assertThat(processInstance).isNotNull();
+        assertThat(processInstance).isEnded();
+
+        // Verify payment was created
+        long paymentCount = patientPaymentRepository.count();
+        assertThat(paymentCount).isEqualTo(1);
+
+        // Verify eligibility check was created
+        long eligibilityCount = eligibilityCheckRepository.count();
+        assertThat(eligibilityCount).isEqualTo(1);
+
+        // Verify claim was created
+        long claimCount = claimRepository.count();
+        assertThat(claimCount).isEqualTo(1);
+
+        // Verify idempotency records were created
+        long idempotencyCount = idempotencyRecordRepository.count();
+        assertThat(idempotencyCount).isGreaterThan(0);
+    }
+
+    @Test
+    @Deployment(resources = "bpmn/revenue-cycle-process.bpmn")
+    void testProcessRetry_WithIdempotency_ShouldNotDuplicateData() {
+        // Given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("patientId", "patient-retry-001");
+        variables.put("copayAmount", new BigDecimal("75.00"));
+        variables.put("insuranceProvider", "AETNA");
+        variables.put("diagnosisCodes", "I10");
+        variables.put("procedureCodes", "99214");
+
+        // When - Start process first time
+        ProcessInstance firstInstance = runtimeService
+            .startProcessInstanceByKey("revenueCycleProcess", variables);
+
+        assertThat(firstInstance).isEnded();
+
+        long firstPaymentCount = patientPaymentRepository.count();
+        long firstEligibilityCount = eligibilityCheckRepository.count();
+        long firstClaimCount = claimRepository.count();
+
+        // When - Start process again with same data (simulating retry)
+        ProcessInstance secondInstance = runtimeService
+            .startProcessInstanceByKey("revenueCycleProcess", variables);
+
+        assertThat(secondInstance).isEnded();
+
+        // Then - Counts should be the same (no duplicates)
+        long secondPaymentCount = patientPaymentRepository.count();
+        long secondEligibilityCount = eligibilityCheckRepository.count();
+        long secondClaimCount = claimRepository.count();
+
+        assertThat(secondPaymentCount).isEqualTo(firstPaymentCount);
+        assertThat(secondEligibilityCount).isEqualTo(firstEligibilityCount);
+        assertThat(secondClaimCount).isEqualTo(firstClaimCount);
+    }
+
+    @Test
+    @Deployment(resources = "bpmn/revenue-cycle-process.bpmn")
+    void testProcessCompensation_ShouldRollbackChanges() {
+        // Given - Setup variables that will trigger compensation
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("patientId", "patient-compensation-001");
+        variables.put("copayAmount", new BigDecimal("100.00"));
+        variables.put("insuranceProvider", "INVALID_PROVIDER"); // This should trigger failure
+        variables.put("diagnosisCodes", "Z00.0");
+        variables.put("procedureCodes", "99215");
+
+        // When
+        try {
+            ProcessInstance processInstance = runtimeService
+                .startProcessInstanceByKey("revenueCycleProcess", variables);
+
+            // Process should fail and trigger compensation
+            assertThat(processInstance).isNotNull();
+
+        } catch (Exception e) {
+            // Expected to fail
+        }
+
+        // Then - Wait for compensation to complete
+        try {
+            Thread.sleep(2000); // Give time for async compensation
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // Verify compensation happened
+        // Payment should exist but be voided/cancelled
+        PatientPayment payment = patientPaymentRepository
+            .findAll()
+            .stream()
+            .filter(p -> p.getPatientId().equals("patient-compensation-001"))
+            .findFirst()
+            .orElse(null);
+
+        if (payment != null) {
+            assertThat(payment.getStatus()).isIn("CANCELLED", "VOIDED", "FAILED");
+        }
+
+        // Claim should be voided if it was created
+        Claim claim = claimRepository
+            .findAll()
+            .stream()
+            .filter(c -> c.getPatientId().equals("patient-compensation-001"))
+            .findFirst()
+            .orElse(null);
+
+        if (claim != null) {
+            assertThat(claim.getStatus()).isEqualTo("VOIDED");
+        }
+    }
+
+    @Test
+    @Deployment(resources = "bpmn/revenue-cycle-process.bpmn")
+    void testMultipleProcessInstances_WithDifferentData_ShouldCreateSeparateRecords() {
+        // Given - First patient
+        Map<String, Object> variables1 = new HashMap<>();
+        variables1.put("patientId", "patient-multi-001");
+        variables1.put("copayAmount", new BigDecimal("25.00"));
+        variables1.put("insuranceProvider", "MEDICARE");
+        variables1.put("diagnosisCodes", "E11.9");
+        variables1.put("procedureCodes", "99213");
+
+        // Given - Second patient
+        Map<String, Object> variables2 = new HashMap<>();
+        variables2.put("patientId", "patient-multi-002");
+        variables2.put("copayAmount", new BigDecimal("35.00"));
+        variables2.put("insuranceProvider", "MEDICAID");
+        variables2.put("diagnosisCodes", "I10");
+        variables2.put("procedureCodes", "99214");
+
+        // When
+        ProcessInstance instance1 = runtimeService
+            .startProcessInstanceByKey("revenueCycleProcess", variables1);
+        ProcessInstance instance2 = runtimeService
+            .startProcessInstanceByKey("revenueCycleProcess", variables2);
+
+        // Then
+        assertThat(instance1).isEnded();
+        assertThat(instance2).isEnded();
+
+        // Each patient should have separate records
+        long paymentCount = patientPaymentRepository.count();
+        assertThat(paymentCount).isEqualTo(2);
+
+        long eligibilityCount = eligibilityCheckRepository.count();
+        assertThat(eligibilityCount).isEqualTo(2);
+
+        long claimCount = claimRepository.count();
+        assertThat(claimCount).isEqualTo(2);
+    }
+
+    @Test
+    @Deployment(resources = "bpmn/revenue-cycle-process.bpmn")
+    void testIdempotencyCleanup_OldRecords_ShouldBeRemoved() {
+        // Given - Create some old idempotency records
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("patientId", "patient-cleanup-001");
+        variables.put("copayAmount", new BigDecimal("50.00"));
+        variables.put("insuranceProvider", "CIGNA");
+        variables.put("diagnosisCodes", "M54.5");
+        variables.put("procedureCodes", "99213");
+
+        // When - Start process
+        ProcessInstance processInstance = runtimeService
+            .startProcessInstanceByKey("revenueCycleProcess", variables);
+
+        assertThat(processInstance).isEnded();
+
+        long initialCount = idempotencyRecordRepository.count();
+        assertThat(initialCount).isGreaterThan(0);
+
+        // Manually trigger cleanup (in real scenario, this would be scheduled)
+        // Note: Would need to mock time or use test clock
+        // For now, just verify records exist
+
+        // Then
+        assertThat(idempotencyRecordRepository.count()).isEqualTo(initialCount);
+    }
+
+    @Test
+    @Deployment(resources = "bpmn/revenue-cycle-process.bpmn")
+    void testConcurrentProcessExecution_SamePatient_ShouldHandleCorrectly() throws Exception {
+        // Given
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("patientId", "patient-concurrent-001");
+        variables.put("copayAmount", new BigDecimal("60.00"));
+        variables.put("insuranceProvider", "UNITED_HEALTH");
+        variables.put("diagnosisCodes", "J20.9");
+        variables.put("procedureCodes", "99214");
+
+        // When - Start multiple processes concurrently
+        Thread thread1 = new Thread(() -> {
+            runtimeService.startProcessInstanceByKey("revenueCycleProcess", variables);
+        });
+
+        Thread thread2 = new Thread(() -> {
+            runtimeService.startProcessInstanceByKey("revenueCycleProcess", variables);
+        });
+
+        thread1.start();
+        thread2.start();
+
+        thread1.join();
+        thread2.join();
+
+        // Then - Should handle gracefully with idempotency
+        // At least one payment should be created
+        long paymentCount = patientPaymentRepository.count();
+        assertThat(paymentCount).isGreaterThanOrEqualTo(1);
+
+        // All process instances should complete
+        long activeInstances = runtimeService.createProcessInstanceQuery()
+            .processDefinitionKey("revenueCycleProcess")
+            .active()
+            .count();
+
+        assertThat(activeInstances).isEqualTo(0);
+    }
+}

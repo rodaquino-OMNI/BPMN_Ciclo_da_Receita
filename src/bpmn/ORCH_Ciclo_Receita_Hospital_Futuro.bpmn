@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_Orchestrator" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.0.0">
+  <bpmn:collaboration id="Collaboration_Orchestrator">
+    <bpmn:participant id="Participant_Hospital" name="Hospital do Futuro - Orquestrador do Ciclo da Receita" processRef="Process_ORCH_Ciclo_Receita" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_ORCH_Ciclo_Receita" name="Orquestrador do Ciclo da Receita" isExecutable="true" camunda:historyTimeToLive="P365D">
+    <bpmn:laneSet id="LaneSet_Orchestrator">
+      <bpmn:lane id="Lane_Orquestrador" name="Orquestrador">
+        <bpmn:flowNodeRef>StartEvent_Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_Agendamento</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_PreAtendimento</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_AtendimentoClinico</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_Faturamento</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_AuditoriaMedica</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_Glosas</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_Cobranca</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_RecebimentoPagamento</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_AnaliseIndicadores</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>CallActivity_MelhoriaContinua</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Fim</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Parallel_Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Parallel_Join</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_Inicio" name="Início do Ciclo da Receita">
+      <bpmn:outgoing>Flow_Start_To_Agendamento</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:callActivity id="CallActivity_Agendamento" name="SUB 01 - Agendamento e Registro" calledElement="Process_SUB01_Agendamento" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Start_To_Agendamento</bpmn:incoming>
+      <bpmn:outgoing>Flow_Agendamento_To_PreAtendimento</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="CallActivity_PreAtendimento" name="SUB 02 - Pré-Atendimento" calledElement="Process_SUB02_PreAtendimento" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Agendamento_To_PreAtendimento</bpmn:incoming>
+      <bpmn:outgoing>Flow_PreAtendimento_To_Atendimento</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="CallActivity_AtendimentoClinico" name="SUB 03 - Atendimento Clínico" calledElement="Process_SUB03_AtendimentoClinico" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_PreAtendimento_To_Atendimento</bpmn:incoming>
+      <bpmn:outgoing>Flow_Atendimento_To_Parallel</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:parallelGateway id="Gateway_Parallel_Inicio" name="Processos Paralelos">
+      <bpmn:incoming>Flow_Atendimento_To_Parallel</bpmn:incoming>
+      <bpmn:outgoing>Flow_Parallel_To_Faturamento</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Parallel_To_Auditoria</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:callActivity id="CallActivity_Faturamento" name="SUB 04 - Faturamento" calledElement="Process_SUB04_Faturamento" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Parallel_To_Faturamento</bpmn:incoming>
+      <bpmn:outgoing>Flow_Faturamento_To_Join</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="CallActivity_AuditoriaMedica" name="SUB 05 - Auditoria Médica" calledElement="Process_SUB05_AuditoriaMedica" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Parallel_To_Auditoria</bpmn:incoming>
+      <bpmn:outgoing>Flow_Auditoria_To_Join</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:parallelGateway id="Gateway_Parallel_Join" name="Sincronização">
+      <bpmn:incoming>Flow_Faturamento_To_Join</bpmn:incoming>
+      <bpmn:incoming>Flow_Auditoria_To_Join</bpmn:incoming>
+      <bpmn:outgoing>Flow_Join_To_Glosas</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:callActivity id="CallActivity_Glosas" name="SUB 06 - Gestão de Glosas" calledElement="Process_SUB06_Glosas" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Join_To_Glosas</bpmn:incoming>
+      <bpmn:outgoing>Flow_Glosas_To_Cobranca</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="CallActivity_Cobranca" name="SUB 07 - Cobrança" calledElement="Process_SUB07_Cobranca" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Glosas_To_Cobranca</bpmn:incoming>
+      <bpmn:outgoing>Flow_Cobranca_To_Recebimento</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="CallActivity_RecebimentoPagamento" name="SUB 08 - Recebimento e Pagamento" calledElement="Process_SUB08_RecebimentoPagamento" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Cobranca_To_Recebimento</bpmn:incoming>
+      <bpmn:outgoing>Flow_Recebimento_To_Analise</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="CallActivity_AnaliseIndicadores" name="SUB 09 - Análise de Indicadores" calledElement="Process_SUB09_AnaliseIndicadores" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Recebimento_To_Analise</bpmn:incoming>
+      <bpmn:outgoing>Flow_Analise_To_Melhoria</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:callActivity id="CallActivity_MelhoriaContinua" name="SUB 10 - Melhoria Contínua" calledElement="Process_SUB10_MelhoriaContinua" camunda:asyncBefore="true">
+      <bpmn:extensionElements>
+        <camunda:in businessKey="${execution.processBusinessKey}" />
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_Analise_To_Melhoria</bpmn:incoming>
+      <bpmn:outgoing>Flow_Melhoria_To_End</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="EndEvent_Fim" name="Ciclo Completo">
+      <bpmn:incoming>Flow_Melhoria_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_To_Agendamento" sourceRef="StartEvent_Inicio" targetRef="CallActivity_Agendamento" />
+    <bpmn:sequenceFlow id="Flow_Agendamento_To_PreAtendimento" sourceRef="CallActivity_Agendamento" targetRef="CallActivity_PreAtendimento" />
+    <bpmn:sequenceFlow id="Flow_PreAtendimento_To_Atendimento" sourceRef="CallActivity_PreAtendimento" targetRef="CallActivity_AtendimentoClinico" />
+    <bpmn:sequenceFlow id="Flow_Atendimento_To_Parallel" sourceRef="CallActivity_AtendimentoClinico" targetRef="Gateway_Parallel_Inicio" />
+    <bpmn:sequenceFlow id="Flow_Parallel_To_Faturamento" sourceRef="Gateway_Parallel_Inicio" targetRef="CallActivity_Faturamento" />
+    <bpmn:sequenceFlow id="Flow_Parallel_To_Auditoria" sourceRef="Gateway_Parallel_Inicio" targetRef="CallActivity_AuditoriaMedica" />
+    <bpmn:sequenceFlow id="Flow_Faturamento_To_Join" sourceRef="CallActivity_Faturamento" targetRef="Gateway_Parallel_Join" />
+    <bpmn:sequenceFlow id="Flow_Auditoria_To_Join" sourceRef="CallActivity_AuditoriaMedica" targetRef="Gateway_Parallel_Join" />
+    <bpmn:sequenceFlow id="Flow_Join_To_Glosas" sourceRef="Gateway_Parallel_Join" targetRef="CallActivity_Glosas" />
+    <bpmn:sequenceFlow id="Flow_Glosas_To_Cobranca" sourceRef="CallActivity_Glosas" targetRef="CallActivity_Cobranca" />
+    <bpmn:sequenceFlow id="Flow_Cobranca_To_Recebimento" sourceRef="CallActivity_Cobranca" targetRef="CallActivity_RecebimentoPagamento" />
+    <bpmn:sequenceFlow id="Flow_Recebimento_To_Analise" sourceRef="CallActivity_RecebimentoPagamento" targetRef="CallActivity_AnaliseIndicadores" />
+    <bpmn:sequenceFlow id="Flow_Analise_To_Melhoria" sourceRef="CallActivity_AnaliseIndicadores" targetRef="CallActivity_MelhoriaContinua" />
+    <bpmn:sequenceFlow id="Flow_Melhoria_To_End" sourceRef="CallActivity_MelhoriaContinua" targetRef="EndEvent_Fim" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Orchestrator">
+    <bpmndi:BPMNPlane id="BPMNPlane_Orchestrator" bpmnElement="Collaboration_Orchestrator">
+      <bpmndi:BPMNShape id="Participant_Hospital_di" bpmnElement="Participant_Hospital" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="3000" height="400" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Orquestrador_di" bpmnElement="Lane_Orquestrador" isHorizontal="true">
+        <dc:Bounds x="190" y="80" width="2970" height="400" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_Inicio_di" bpmnElement="StartEvent_Inicio">
+        <dc:Bounds x="252" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="231" y="295" width="78" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_Agendamento_di" bpmnElement="CallActivity_Agendamento">
+        <dc:Bounds x="340" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_PreAtendimento_di" bpmnElement="CallActivity_PreAtendimento">
+        <dc:Bounds x="490" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_AtendimentoClinico_di" bpmnElement="CallActivity_AtendimentoClinico">
+        <dc:Bounds x="640" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Parallel_Inicio_di" bpmnElement="Gateway_Parallel_Inicio">
+        <dc:Bounds x="795" y="245" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="784" y="215" width="72" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_Faturamento_di" bpmnElement="CallActivity_Faturamento">
+        <dc:Bounds x="900" y="150" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_AuditoriaMedica_di" bpmnElement="CallActivity_AuditoriaMedica">
+        <dc:Bounds x="900" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Parallel_Join_di" bpmnElement="Gateway_Parallel_Join">
+        <dc:Bounds x="1055" y="245" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1043" y="215" width="74" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_Glosas_di" bpmnElement="CallActivity_Glosas">
+        <dc:Bounds x="1160" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_Cobranca_di" bpmnElement="CallActivity_Cobranca">
+        <dc:Bounds x="1310" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_RecebimentoPagamento_di" bpmnElement="CallActivity_RecebimentoPagamento">
+        <dc:Bounds x="1460" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_AnaliseIndicadores_di" bpmnElement="CallActivity_AnaliseIndicadores">
+        <dc:Bounds x="1610" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="CallActivity_MelhoriaContinua_di" bpmnElement="CallActivity_MelhoriaContinua">
+        <dc:Bounds x="1760" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Fim_di" bpmnElement="EndEvent_Fim">
+        <dc:Bounds x="1912" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1895" y="295" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_To_Agendamento_di" bpmnElement="Flow_Start_To_Agendamento">
+        <di:waypoint x="288" y="270" />
+        <di:waypoint x="340" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Agendamento_To_PreAtendimento_di" bpmnElement="Flow_Agendamento_To_PreAtendimento">
+        <di:waypoint x="440" y="270" />
+        <di:waypoint x="490" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PreAtendimento_To_Atendimento_di" bpmnElement="Flow_PreAtendimento_To_Atendimento">
+        <di:waypoint x="590" y="270" />
+        <di:waypoint x="640" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Atendimento_To_Parallel_di" bpmnElement="Flow_Atendimento_To_Parallel">
+        <di:waypoint x="740" y="270" />
+        <di:waypoint x="795" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Parallel_To_Faturamento_di" bpmnElement="Flow_Parallel_To_Faturamento">
+        <di:waypoint x="820" y="245" />
+        <di:waypoint x="820" y="190" />
+        <di:waypoint x="900" y="190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Parallel_To_Auditoria_di" bpmnElement="Flow_Parallel_To_Auditoria">
+        <di:waypoint x="820" y="295" />
+        <di:waypoint x="820" y="360" />
+        <di:waypoint x="900" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Faturamento_To_Join_di" bpmnElement="Flow_Faturamento_To_Join">
+        <di:waypoint x="1000" y="190" />
+        <di:waypoint x="1080" y="190" />
+        <di:waypoint x="1080" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Auditoria_To_Join_di" bpmnElement="Flow_Auditoria_To_Join">
+        <di:waypoint x="1000" y="360" />
+        <di:waypoint x="1080" y="360" />
+        <di:waypoint x="1080" y="295" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Join_To_Glosas_di" bpmnElement="Flow_Join_To_Glosas">
+        <di:waypoint x="1105" y="270" />
+        <di:waypoint x="1160" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Glosas_To_Cobranca_di" bpmnElement="Flow_Glosas_To_Cobranca">
+        <di:waypoint x="1260" y="270" />
+        <di:waypoint x="1310" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Cobranca_To_Recebimento_di" bpmnElement="Flow_Cobranca_To_Recebimento">
+        <di:waypoint x="1410" y="270" />
+        <di:waypoint x="1460" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Recebimento_To_Analise_di" bpmnElement="Flow_Recebimento_To_Analise">
+        <di:waypoint x="1560" y="270" />
+        <di:waypoint x="1610" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Analise_To_Melhoria_di" bpmnElement="Flow_Analise_To_Melhoria">
+        <di:waypoint x="1710" y="270" />
+        <di:waypoint x="1760" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Melhoria_To_End_di" bpmnElement="Flow_Melhoria_To_End">
+        <di:waypoint x="1860" y="270" />
+        <di:waypoint x="1912" y="270" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
+             id="glosa-classification-dmn"
+             name="Glosa Classification Rules"
+             namespace="http://camunda.org/schema/1.0/dmn">
+
+  <decision id="classifyGlosa" name="Classify Glosa Type and Action" camunda:historyTimeToLive="P180D">
+    <decisionTable id="glosaClassificationTable" hitPolicy="FIRST">
+      <input id="input1" label="Glosa Reason">
+        <inputExpression id="inputExpression1" typeRef="string">
+          <text>glosaReason</text>
+        </inputExpression>
+      </input>
+      <input id="input2" label="Glosa Amount">
+        <inputExpression id="inputExpression2" typeRef="number">
+          <text>glosaAmount</text>
+        </inputExpression>
+      </input>
+      <input id="input3" label="Documentation Available">
+        <inputExpression id="inputExpression3" typeRef="boolean">
+          <text>documentationAvailable</text>
+        </inputExpression>
+      </input>
+      <input id="input4" label="Previous Appeals">
+        <inputExpression id="inputExpression4" typeRef="number">
+          <text>previousAppeals</text>
+        </inputExpression>
+      </input>
+      <input id="input5" label="Clinical Justification">
+        <inputExpression id="inputExpression5" typeRef="string">
+          <text>clinicalJustification</text>
+        </inputExpression>
+      </input>
+
+      <output id="output1" label="Glosa Type" name="glosaType" typeRef="string" />
+      <output id="output2" label="Recoverability" name="recoverability" typeRef="string" />
+      <output id="output3" label="Recommended Action" name="recommendedAction" typeRef="string" />
+      <output id="output4" label="Priority" name="priority" typeRef="string" />
+      <output id="output5" label="SLA Days" name="slaDays" typeRef="number" />
+
+      <!-- Rule 1: Administrative glosa - missing documents, recoverable -->
+      <rule id="rule1">
+        <inputEntry id="inputEntry1_1">
+          <text>"MISSING_DOCUMENTS","INCOMPLETE_FORMS"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_3">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_4">
+          <text>&lt; 2</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry1_1">
+          <text>"ADMINISTRATIVE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_2">
+          <text>"HIGH"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_3">
+          <text>"SUBMIT_DOCUMENTATION"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_4">
+          <text>"HIGH"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_5">
+          <text>10</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 2: Technical glosa - coding errors, high value -->
+      <rule id="rule2">
+        <inputEntry id="inputEntry2_1">
+          <text>"CODING_ERROR","WRONG_PROCEDURE_CODE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_2">
+          <text>&gt; 5000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_3">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_4">
+          <text>0</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry2_1">
+          <text>"TECHNICAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_2">
+          <text>"MEDIUM"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_3">
+          <text>"CORRECT_AND_RESUBMIT"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_4">
+          <text>"CRITICAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_5">
+          <text>15</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 3: Clinical glosa - lack of medical necessity, with justification -->
+      <rule id="rule3">
+        <inputEntry id="inputEntry3_1">
+          <text>"LACK_MEDICAL_NECESSITY","NOT_COVERED_PROCEDURE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_3">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_4">
+          <text>&lt; 1</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_5">
+          <text>"STRONG","ADEQUATE"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry3_1">
+          <text>"CLINICAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_2">
+          <text>"MEDIUM"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_3">
+          <text>"MEDICAL_APPEAL_WITH_LLM"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_4">
+          <text>"HIGH"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_5">
+          <text>20</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 4: Clinical glosa - weak justification, multiple appeals -->
+      <rule id="rule4">
+        <inputEntry id="inputEntry4_1">
+          <text>"LACK_MEDICAL_NECESSITY"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_4">
+          <text>&gt;= 2</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_5">
+          <text>"WEAK","INSUFFICIENT"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry4_1">
+          <text>"CLINICAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_2">
+          <text>"LOW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_3">
+          <text>"ACCEPT_GLOSA"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_4">
+          <text>"LOW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_5">
+          <text>5</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 5: Contractual glosa - not covered by plan -->
+      <rule id="rule5">
+        <inputEntry id="inputEntry5_1">
+          <text>"NOT_COVERED_BY_PLAN","OUT_OF_NETWORK"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry5_1">
+          <text>"CONTRACTUAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_2">
+          <text>"LOW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_3">
+          <text>"BILL_PATIENT_DIRECTLY"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_4">
+          <text>"MEDIUM"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_5">
+          <text>30</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 6: Duplicate billing -->
+      <rule id="rule6">
+        <inputEntry id="inputEntry6_1">
+          <text>"DUPLICATE_BILLING"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry6_1">
+          <text>"ADMINISTRATIVE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_2">
+          <text>"NONE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_3">
+          <text>"ACCEPT_AND_CORRECT"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_4">
+          <text>"MEDIUM"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_5">
+          <text>7</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 7: High-value glosa requiring management review -->
+      <rule id="rule7">
+        <inputEntry id="inputEntry7_1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_2">
+          <text>&gt; 20000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_3">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_5">
+          <text>"STRONG","ADEQUATE"</text>
+        </inputEntry>
+        <outputEntry id="outputEntry7_1">
+          <text>"HIGH_VALUE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_2">
+          <text>"HIGH"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_3">
+          <text>"MANAGEMENT_REVIEW_AND_APPEAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_4">
+          <text>"CRITICAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_5">
+          <text>25</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 8: Low-value administrative glosa -->
+      <rule id="rule8">
+        <inputEntry id="inputEntry8_1">
+          <text>"MINOR_DOCUMENTATION_ISSUE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_2">
+          <text>&lt; 500</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_3">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry8_1">
+          <text>"ADMINISTRATIVE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_2">
+          <text>"LOW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_3">
+          <text>"ACCEPT_IF_COST_PROHIBITIVE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_4">
+          <text>"LOW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_5">
+          <text>15</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

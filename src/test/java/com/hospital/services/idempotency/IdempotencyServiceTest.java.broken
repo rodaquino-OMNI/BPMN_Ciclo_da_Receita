@@ -1,0 +1,387 @@
+package com.hospital.services.idempotency;
+
+import com.hospital.model.IdempotencyRecord;
+import com.hospital.repository.IdempotencyRecordRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.*;
+
+/**
+ * Comprehensive test suite for IdempotencyService
+ *
+ * Tests cover:
+ * - New operation execution
+ * - Duplicate operation detection
+ * - Concurrent request handling
+ * - Key generation consistency
+ * - Expiry cleanup
+ * - Error scenarios
+ */
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+class IdempotencyServiceTest {
+
+    @Autowired
+    private IdempotencyService idempotencyService;
+
+    @Autowired
+    private IdempotencyRecordRepository idempotencyRecordRepository;
+
+    @BeforeEach
+    void setUp() {
+        // Clean up any existing records
+        idempotencyRecordRepository.deleteAll();
+    }
+
+    @Test
+    void testExecuteIdempotent_NewOperation_ShouldExecute() {
+        // Given
+        AtomicInteger executionCount = new AtomicInteger(0);
+        String operationType = "TEST_OP";
+        String idempotencyKey = "test-key-1";
+
+        // When
+        String result = idempotencyService.executeIdempotent(
+            operationType,
+            idempotencyKey,
+            () -> {
+                executionCount.incrementAndGet();
+                return "result";
+            }
+        );
+
+        // Then
+        assertThat(executionCount.get()).isEqualTo(1);
+        assertThat(result).isEqualTo("result");
+
+        // Verify record was created
+        IdempotencyRecord record = idempotencyRecordRepository
+            .findByOperationTypeAndIdempotencyKey(operationType, idempotencyKey)
+            .orElseThrow();
+
+        assertThat(record.getResult()).isEqualTo("result");
+        assertThat(record.isSuccess()).isTrue();
+    }
+
+    @Test
+    void testExecuteIdempotent_DuplicateOperation_ShouldReturnCached() {
+        // Given
+        AtomicInteger executionCount = new AtomicInteger(0);
+        String operationType = "TEST_OP";
+        String idempotencyKey = "test-key-duplicate";
+
+        // When - Execute first time
+        String result1 = idempotencyService.executeIdempotent(
+            operationType,
+            idempotencyKey,
+            () -> {
+                executionCount.incrementAndGet();
+                return "first-result";
+            }
+        );
+
+        // When - Execute second time with different operation
+        String result2 = idempotencyService.executeIdempotent(
+            operationType,
+            idempotencyKey,
+            () -> {
+                executionCount.incrementAndGet();
+                return "second-result";
+            }
+        );
+
+        // Then
+        assertThat(executionCount.get()).isEqualTo(1); // Only executed once
+        assertThat(result1).isEqualTo("first-result");
+        assertThat(result2).isEqualTo("first-result"); // Returns cached result
+    }
+
+    @Test
+    void testExecuteIdempotent_ConcurrentRequests_ShouldHandleOptimisticLocking() throws Exception {
+        // Given
+        String operationType = "CONCURRENT_OP";
+        String idempotencyKey = "test-key-concurrent";
+        AtomicInteger executionCount = new AtomicInteger(0);
+        int threadCount = 10;
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        List<Future<String>> futures = new ArrayList<>();
+
+        // When - Execute same operation concurrently
+        for (int i = 0; i < threadCount; i++) {
+            Future<String> future = executor.submit(() -> {
+                try {
+                    latch.countDown();
+                    latch.await(); // Synchronize start
+
+                    return idempotencyService.executeIdempotent(
+                        operationType,
+                        idempotencyKey,
+                        () -> {
+                            executionCount.incrementAndGet();
+                            // Simulate some work
+                            Thread.sleep(50);
+                            return "concurrent-result";
+                        }
+                    );
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException(e);
+                }
+            });
+            futures.add(future);
+        }
+
+        // Then - Collect results
+        List<String> results = new ArrayList<>();
+        for (Future<String> future : futures) {
+            results.add(future.get(5, TimeUnit.SECONDS));
+        }
+
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+
+        // Verify
+        assertThat(results).hasSize(threadCount);
+        assertThat(results).allMatch(r -> r.equals("concurrent-result"));
+
+        // Operation should be executed only once despite concurrent attempts
+        // Note: Due to optimistic locking, some retries might occur
+        assertThat(executionCount.get()).isGreaterThanOrEqualTo(1);
+        assertThat(executionCount.get()).isLessThanOrEqualTo(3); // Allow some retries
+    }
+
+    @Test
+    void testExecuteIdempotent_OperationFailure_ShouldNotCacheError() {
+        // Given
+        String operationType = "FAILING_OP";
+        String idempotencyKey = "test-key-failure";
+        AtomicInteger executionCount = new AtomicInteger(0);
+
+        // When - First attempt fails
+        assertThatThrownBy(() -> {
+            idempotencyService.executeIdempotent(
+                operationType,
+                idempotencyKey,
+                () -> {
+                    executionCount.incrementAndGet();
+                    throw new RuntimeException("Simulated failure");
+                }
+            );
+        }).isInstanceOf(RuntimeException.class)
+          .hasMessageContaining("Simulated failure");
+
+        // When - Second attempt succeeds
+        String result = idempotencyService.executeIdempotent(
+            operationType,
+            idempotencyKey,
+            () -> {
+                executionCount.incrementAndGet();
+                return "success-after-failure";
+            }
+        );
+
+        // Then
+        assertThat(executionCount.get()).isEqualTo(2); // Both attempts executed
+        assertThat(result).isEqualTo("success-after-failure");
+    }
+
+    @Test
+    void testGenerateIdempotencyKey_ConsistentOutput() {
+        // Given
+        String processInstanceId = "proc-123";
+        String activityId = "activity-1";
+        String businessKey = "patient-456";
+
+        // When
+        String key1 = IdempotencyService.generateIdempotencyKey(
+            processInstanceId, activityId, businessKey
+        );
+        String key2 = IdempotencyService.generateIdempotencyKey(
+            processInstanceId, activityId, businessKey
+        );
+
+        // Then
+        assertThat(key1).isEqualTo(key2);
+        assertThat(key1).contains(processInstanceId);
+        assertThat(key1).contains(activityId);
+        assertThat(key1).contains(businessKey);
+    }
+
+    @Test
+    void testGenerateIdempotencyKey_DifferentInputs_DifferentKeys() {
+        // Given
+        String processInstanceId1 = "proc-123";
+        String processInstanceId2 = "proc-456";
+        String activityId = "activity-1";
+        String businessKey = "patient-789";
+
+        // When
+        String key1 = IdempotencyService.generateIdempotencyKey(
+            processInstanceId1, activityId, businessKey
+        );
+        String key2 = IdempotencyService.generateIdempotencyKey(
+            processInstanceId2, activityId, businessKey
+        );
+
+        // Then
+        assertThat(key1).isNotEqualTo(key2);
+    }
+
+    @Test
+    void testCleanupExpiredRecords_ShouldRemoveOldRecords() {
+        // Given - Create records with different timestamps
+        IdempotencyRecord oldRecord = new IdempotencyRecord();
+        oldRecord.setOperationType("OLD_OP");
+        oldRecord.setIdempotencyKey("old-key");
+        oldRecord.setResult("old-result");
+        oldRecord.setSuccess(true);
+        oldRecord.setCreatedAt(LocalDateTime.now().minusDays(8)); // 8 days old
+        idempotencyRecordRepository.save(oldRecord);
+
+        IdempotencyRecord recentRecord = new IdempotencyRecord();
+        recentRecord.setOperationType("RECENT_OP");
+        recentRecord.setIdempotencyKey("recent-key");
+        recentRecord.setResult("recent-result");
+        recentRecord.setSuccess(true);
+        recentRecord.setCreatedAt(LocalDateTime.now().minusHours(1)); // 1 hour old
+        idempotencyRecordRepository.save(recentRecord);
+
+        // When
+        idempotencyService.cleanupExpiredRecords();
+
+        // Then
+        assertThat(idempotencyRecordRepository.findById(oldRecord.getId()))
+            .isEmpty();
+        assertThat(idempotencyRecordRepository.findById(recentRecord.getId()))
+            .isPresent();
+    }
+
+    @Test
+    void testExecuteIdempotent_NullResult_ShouldHandleGracefully() {
+        // Given
+        String operationType = "NULL_RESULT_OP";
+        String idempotencyKey = "test-key-null";
+
+        // When
+        String result = idempotencyService.executeIdempotent(
+            operationType,
+            idempotencyKey,
+            () -> null
+        );
+
+        // Then
+        assertThat(result).isNull();
+
+        // Verify record was created with null result
+        IdempotencyRecord record = idempotencyRecordRepository
+            .findByOperationTypeAndIdempotencyKey(operationType, idempotencyKey)
+            .orElseThrow();
+
+        assertThat(record.getResult()).isNull();
+        assertThat(record.isSuccess()).isTrue();
+    }
+
+    @Test
+    void testExecuteIdempotent_LongResult_ShouldTruncate() {
+        // Given
+        String operationType = "LONG_RESULT_OP";
+        String idempotencyKey = "test-key-long";
+        String longResult = "x".repeat(2000); // Longer than typical VARCHAR limit
+
+        // When
+        String result = idempotencyService.executeIdempotent(
+            operationType,
+            idempotencyKey,
+            () -> longResult
+        );
+
+        // Then
+        assertThat(result).isEqualTo(longResult);
+
+        // Verify record was created (result may be truncated in DB)
+        IdempotencyRecord record = idempotencyRecordRepository
+            .findByOperationTypeAndIdempotencyKey(operationType, idempotencyKey)
+            .orElseThrow();
+
+        assertThat(record.getResult()).isNotNull();
+    }
+
+    @Test
+    void testExecuteIdempotent_DifferentOperationType_ShouldExecuteSeparately() {
+        // Given
+        String idempotencyKey = "shared-key";
+        AtomicInteger count1 = new AtomicInteger(0);
+        AtomicInteger count2 = new AtomicInteger(0);
+
+        // When
+        String result1 = idempotencyService.executeIdempotent(
+            "OP_TYPE_1",
+            idempotencyKey,
+            () -> {
+                count1.incrementAndGet();
+                return "result-1";
+            }
+        );
+
+        String result2 = idempotencyService.executeIdempotent(
+            "OP_TYPE_2",
+            idempotencyKey,
+            () -> {
+                count2.incrementAndGet();
+                return "result-2";
+            }
+        );
+
+        // Then
+        assertThat(count1.get()).isEqualTo(1);
+        assertThat(count2.get()).isEqualTo(1);
+        assertThat(result1).isEqualTo("result-1");
+        assertThat(result2).isEqualTo("result-2");
+    }
+
+    @Test
+    void testExecuteIdempotent_RetryAfterTimeout_ShouldSucceed() throws Exception {
+        // Given
+        String operationType = "TIMEOUT_OP";
+        String idempotencyKey = "test-key-timeout";
+
+        // Simulate a timeout scenario by creating a record manually
+        IdempotencyRecord timeoutRecord = new IdempotencyRecord();
+        timeoutRecord.setOperationType(operationType);
+        timeoutRecord.setIdempotencyKey(idempotencyKey);
+        timeoutRecord.setResult("timeout");
+        timeoutRecord.setSuccess(false);
+        timeoutRecord.setCreatedAt(LocalDateTime.now().minusMinutes(10));
+        idempotencyRecordRepository.save(timeoutRecord);
+
+        // When - Retry the operation
+        AtomicInteger executionCount = new AtomicInteger(0);
+        String result = idempotencyService.executeIdempotent(
+            operationType,
+            idempotencyKey,
+            () -> {
+                executionCount.incrementAndGet();
+                return "success-after-timeout";
+            }
+        );
+
+        // Then
+        assertThat(executionCount.get()).isEqualTo(1);
+        assertThat(result).isEqualTo("success-after-timeout");
+    }
+}

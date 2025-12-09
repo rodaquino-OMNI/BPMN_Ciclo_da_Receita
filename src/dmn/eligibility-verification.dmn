@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
+             id="eligibility-verification-dmn"
+             name="Eligibility Verification Rules"
+             namespace="http://camunda.org/schema/1.0/dmn">
+
+  <decision id="checkEligibility" name="Check Patient Eligibility" camunda:historyTimeToLive="P180D">
+    <decisionTable id="eligibilityTable" hitPolicy="FIRST">
+      <input id="input1" label="Insurance Status">
+        <inputExpression id="inputExpression1" typeRef="string">
+          <text>insuranceStatus</text>
+        </inputExpression>
+      </input>
+      <input id="input2" label="Plan Active">
+        <inputExpression id="inputExpression2" typeRef="boolean">
+          <text>planActive</text>
+        </inputExpression>
+      </input>
+      <input id="input3" label="Coverage Valid">
+        <inputExpression id="inputExpression3" typeRef="boolean">
+          <text>coverageValid</text>
+        </inputExpression>
+      </input>
+      <input id="input4" label="Carency Period">
+        <inputExpression id="inputExpression4" typeRef="boolean">
+          <text>carencyPeriodMet</text>
+        </inputExpression>
+      </input>
+      <input id="input5" label="Co-participation Limit">
+        <inputExpression id="inputExpression5" typeRef="boolean">
+          <text>coParticipationOk</text>
+        </inputExpression>
+      </input>
+
+      <output id="output1" label="Eligibility Result" name="eligibilityResult" typeRef="string" />
+      <output id="output2" label="Reason" name="reason" typeRef="string" />
+      <output id="output3" label="Action Required" name="actionRequired" typeRef="string" />
+
+      <!-- Rule 1: All criteria met -->
+      <rule id="rule1">
+        <inputEntry id="inputEntry1_1">
+          <text>"ACTIVE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_2">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_3">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_4">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_5">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="outputEntry1_1">
+          <text>"ELIGIBLE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_2">
+          <text>"All eligibility criteria met"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_3">
+          <text>"PROCEED"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 2: Plan inactive -->
+      <rule id="rule2">
+        <inputEntry id="inputEntry2_1">
+          <text>"ACTIVE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_2">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry2_1">
+          <text>"NOT_ELIGIBLE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_2">
+          <text>"Insurance plan is inactive"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_3">
+          <text>"CONTACT_INSURANCE"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 3: Coverage not valid -->
+      <rule id="rule3">
+        <inputEntry id="inputEntry3_1">
+          <text>"ACTIVE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_2">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_3">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry3_1">
+          <text>"NOT_ELIGIBLE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_2">
+          <text>"Coverage period expired or invalid"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_3">
+          <text>"RENEW_COVERAGE"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 4: Carency period not met -->
+      <rule id="rule4">
+        <inputEntry id="inputEntry4_1">
+          <text>"ACTIVE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_2">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_3">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_4">
+          <text>false</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry4_1">
+          <text>"PENDING"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_2">
+          <text>"Carency period not completed"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_3">
+          <text>"WAIT_OR_PRIVATE"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 5: Co-participation limit exceeded -->
+      <rule id="rule5">
+        <inputEntry id="inputEntry5_1">
+          <text>"ACTIVE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_2">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_3">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_4">
+          <text>true</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_5">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry5_1">
+          <text>"ELIGIBLE_WITH_LIMITS"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_2">
+          <text>"Co-participation limit reached"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_3">
+          <text>"PATIENT_PAYMENT_REQUIRED"</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 6: Insurance suspended/cancelled -->
+      <rule id="rule6">
+        <inputEntry id="inputEntry6_1">
+          <text>"SUSPENDED","CANCELLED"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_5">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry6_1">
+          <text>"NOT_ELIGIBLE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_2">
+          <text>"Insurance status is suspended or cancelled"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_3">
+          <text>"PRIVATE_PAYMENT_ONLY"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

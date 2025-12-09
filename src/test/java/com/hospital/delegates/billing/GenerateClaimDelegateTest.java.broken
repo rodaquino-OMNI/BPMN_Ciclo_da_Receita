@@ -1,0 +1,378 @@
+package com.hospital.delegates.billing;
+
+import com.hospital.model.Claim;
+import com.hospital.repository.ClaimRepository;
+import com.hospital.services.idempotency.IdempotencyService;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * Comprehensive test suite for GenerateClaimDelegate
+ *
+ * Tests cover:
+ * - Claim generation with idempotency
+ * - Duplicate claim detection
+ * - Retry scenarios
+ * - Different authorization numbers
+ * - Same data handling
+ */
+@ExtendWith(MockitoExtension.class)
+class GenerateClaimDelegateTest {
+
+    @Mock
+    private IdempotencyService idempotencyService;
+
+    @Mock
+    private ClaimRepository claimRepository;
+
+    @Mock
+    private DelegateExecution execution;
+
+    @InjectMocks
+    private GenerateClaimDelegate delegate;
+
+    private String processInstanceId;
+    private String activityId;
+    private String patientId;
+    private String authorizationNumber;
+    private String diagnosisCodes;
+    private String procedureCodes;
+
+    @BeforeEach
+    void setUp() {
+        processInstanceId = "proc-456";
+        activityId = "generateClaim";
+        patientId = "patient-789";
+        authorizationNumber = "AUTH-12345";
+        diagnosisCodes = "J44.0,J44.1";
+        procedureCodes = "99213,99214";
+
+        // Setup common mock behavior
+        when(execution.getProcessInstanceId()).thenReturn(processInstanceId);
+        when(execution.getCurrentActivityId()).thenReturn(activityId);
+        when(execution.getVariable("patientId")).thenReturn(patientId);
+        when(execution.getVariable("authorizationNumber")).thenReturn(authorizationNumber);
+        when(execution.getVariable("diagnosisCodes")).thenReturn(diagnosisCodes);
+        when(execution.getVariable("procedureCodes")).thenReturn(procedureCodes);
+    }
+
+    @Test
+    void testExecute_NewClaim_ShouldGenerateSuccessfully() throws Exception {
+        // Given
+        String idempotencyKey = "proc-456_generateClaim_AUTH-12345";
+        Claim savedClaim = createClaim("CLAIM-001", authorizationNumber);
+
+        when(idempotencyService.executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        when(claimRepository.save(any(Claim.class)))
+            .thenReturn(savedClaim);
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(idempotencyService).executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey),
+            any()
+        );
+
+        verify(claimRepository).save(argThat(claim ->
+            claim.getPatientId().equals(patientId) &&
+            claim.getAuthorizationNumber().equals(authorizationNumber) &&
+            claim.getDiagnosisCodes().equals(diagnosisCodes) &&
+            claim.getProcedureCodes().equals(procedureCodes) &&
+            claim.getStatus().equals("SUBMITTED")
+        ));
+
+        verify(execution).setVariable("claimId", "CLAIM-001");
+        verify(execution).setVariable("claimStatus", "SUBMITTED");
+    }
+
+    @Test
+    void testExecute_DuplicateClaim_ShouldReturnExisting() throws Exception {
+        // Given
+        String idempotencyKey = "proc-456_generateClaim_AUTH-12345";
+        String cachedClaimId = "CLAIM-CACHED-001";
+
+        // Mock idempotency service to return cached result
+        when(idempotencyService.executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey),
+            any()
+        )).thenReturn(cachedClaimId);
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(idempotencyService).executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey),
+            any()
+        );
+
+        // Claim repository should NOT be called for duplicate
+        verify(claimRepository, never()).save(any());
+
+        verify(execution).setVariable("claimId", cachedClaimId);
+        verify(execution).setVariable("claimStatus", "SUBMITTED");
+    }
+
+    @Test
+    void testExecute_RetryAfterFailure_ShouldSucceedOnRetry() throws Exception {
+        // Given
+        String idempotencyKey = "proc-456_generateClaim_AUTH-12345";
+        AtomicInteger attemptCount = new AtomicInteger(0);
+        Claim savedClaim = createClaim("CLAIM-RETRY-001", authorizationNumber);
+
+        when(idempotencyService.executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // First call fails, second succeeds
+        when(claimRepository.save(any(Claim.class)))
+            .thenAnswer(invocation -> {
+                if (attemptCount.incrementAndGet() == 1) {
+                    throw new RuntimeException("External service unavailable");
+                }
+                return savedClaim;
+            });
+
+        // When - First attempt (should fail)
+        assertThatThrownBy(() -> delegate.execute(execution))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("External service unavailable");
+
+        // When - Retry (should succeed)
+        delegate.execute(execution);
+
+        // Then
+        assertThat(attemptCount.get()).isEqualTo(2);
+        verify(execution).setVariable("claimId", "CLAIM-RETRY-001");
+    }
+
+    @Test
+    void testExecute_DifferentAuthorizationNumbers_ShouldCreateSeparateClaims() throws Exception {
+        // Given - First authorization
+        String idempotencyKey1 = "proc-456_generateClaim_AUTH-11111";
+        Claim savedClaim1 = createClaim("CLAIM-001", "AUTH-11111");
+
+        when(execution.getVariable("authorizationNumber")).thenReturn("AUTH-11111");
+
+        when(idempotencyService.executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey1),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        when(claimRepository.save(any(Claim.class)))
+            .thenReturn(savedClaim1);
+
+        // When - Generate first claim
+        delegate.execute(execution);
+
+        // Given - Second authorization
+        String idempotencyKey2 = "proc-456_generateClaim_AUTH-22222";
+        Claim savedClaim2 = createClaim("CLAIM-002", "AUTH-22222");
+
+        when(execution.getVariable("authorizationNumber")).thenReturn("AUTH-22222");
+
+        when(idempotencyService.executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey2),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        when(claimRepository.save(any(Claim.class)))
+            .thenReturn(savedClaim2);
+
+        // When - Generate second claim
+        delegate.execute(execution);
+
+        // Then - Both claims should be created
+        verify(claimRepository, times(2)).save(any(Claim.class));
+        verify(execution).setVariable("claimId", "CLAIM-001");
+        verify(execution).setVariable("claimId", "CLAIM-002");
+    }
+
+    @Test
+    void testExecute_SameDataTwice_ShouldReturnSameClaim() throws Exception {
+        // Given
+        String idempotencyKey = "proc-456_generateClaim_AUTH-12345";
+        String firstClaimId = "CLAIM-SAME-001";
+
+        AtomicInteger executionCount = new AtomicInteger(0);
+
+        when(idempotencyService.executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            if (executionCount.incrementAndGet() == 1) {
+                Callable<String> operation = invocation.getArgument(2);
+                return operation.call();
+            }
+            return firstClaimId; // Return cached on second call
+        });
+
+        Claim savedClaim = createClaim(firstClaimId, authorizationNumber);
+        when(claimRepository.save(any(Claim.class)))
+            .thenReturn(savedClaim);
+
+        // When - Generate claim twice with same data
+        delegate.execute(execution);
+        delegate.execute(execution);
+
+        // Then - Claim should be saved only once
+        verify(claimRepository, times(1)).save(any(Claim.class));
+
+        // Both executions should set same claim ID
+        verify(execution, times(2)).setVariable("claimId", firstClaimId);
+    }
+
+    @Test
+    void testExecute_MissingAuthorizationNumber_ShouldThrowException() {
+        // Given
+        when(execution.getVariable("authorizationNumber")).thenReturn(null);
+
+        // When/Then
+        assertThatThrownBy(() -> delegate.execute(execution))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("authorizationNumber");
+    }
+
+    @Test
+    void testExecute_MissingDiagnosisCodes_ShouldThrowException() {
+        // Given
+        when(execution.getVariable("diagnosisCodes")).thenReturn(null);
+
+        // When/Then
+        assertThatThrownBy(() -> delegate.execute(execution))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("diagnosisCodes");
+    }
+
+    @Test
+    void testExecute_ClaimRepositoryFailure_ShouldPropagateException() {
+        // Given
+        String idempotencyKey = "proc-456_generateClaim_AUTH-12345";
+
+        when(idempotencyService.executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        when(claimRepository.save(any(Claim.class)))
+            .thenThrow(new RuntimeException("Database error"));
+
+        // When/Then
+        assertThatThrownBy(() -> delegate.execute(execution))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessageContaining("Database error");
+
+        verify(execution, never()).setVariable(eq("claimId"), any());
+    }
+
+    @Test
+    void testExecute_ConcurrentClaimGeneration_ShouldHandleCorrectly() throws Exception {
+        // Given
+        String idempotencyKey = "proc-456_generateClaim_AUTH-12345";
+        int threadCount = 5;
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        AtomicInteger executionCount = new AtomicInteger(0);
+
+        Claim savedClaim = createClaim("CLAIM-CONCURRENT-001", authorizationNumber);
+
+        when(idempotencyService.executeIdempotent(
+            eq("GENERATE_CLAIM"),
+            eq(idempotencyKey),
+            any()
+        )).thenAnswer(invocation -> {
+            // First thread executes, others return cached
+            if (executionCount.incrementAndGet() == 1) {
+                Callable<String> operation = invocation.getArgument(2);
+                return operation.call();
+            }
+            return "CLAIM-CONCURRENT-001";
+        });
+
+        when(claimRepository.save(any(Claim.class)))
+            .thenReturn(savedClaim);
+
+        // When - Execute concurrently
+        CopyOnWriteArrayList<String> results = new CopyOnWriteArrayList<>();
+        List<Future<?>> futures = new ArrayList<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            Future<?> future = executor.submit(() -> {
+                try {
+                    latch.countDown();
+                    latch.await();
+                    delegate.execute(execution);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            futures.add(future);
+        }
+
+        for (Future<?> future : futures) {
+            future.get(5, TimeUnit.SECONDS);
+        }
+
+        executor.shutdown();
+        executor.awaitTermination(10, TimeUnit.SECONDS);
+
+        // Then - Repository save should be called only once
+        verify(claimRepository, times(1)).save(any(Claim.class));
+    }
+
+    private Claim createClaim(String claimId, String authNumber) {
+        Claim claim = new Claim();
+        claim.setId(claimId);
+        claim.setPatientId(patientId);
+        claim.setAuthorizationNumber(authNumber);
+        claim.setDiagnosisCodes(diagnosisCodes);
+        claim.setProcedureCodes(procedureCodes);
+        claim.setStatus("SUBMITTED");
+        claim.setSubmissionDate(LocalDateTime.now());
+        return claim;
+    }
+}

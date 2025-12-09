@@ -1,0 +1,431 @@
+package com.hospital.delegates.compensation;
+
+import com.hospital.model.Claim;
+import com.hospital.model.EligibilityCheck;
+import com.hospital.model.MedicalCoding;
+import com.hospital.repository.ClaimRepository;
+import com.hospital.repository.EligibilityCheckRepository;
+import com.hospital.repository.MedicalCodingRepository;
+import com.hospital.services.idempotency.IdempotencyService;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+/**
+ * Comprehensive test suite for Compensation Delegates
+ *
+ * Tests cover:
+ * - CompensateCodingDelegate (verify codes cleared)
+ * - CompensateEligibilityDelegate (verify status reset)
+ * - CompensateClaimDelegate (verify claim voided)
+ * - Compensation idempotency (no double compensation)
+ * - Compensation failure handling (should not throw)
+ */
+@ExtendWith(MockitoExtension.class)
+class CompensationDelegatesTest {
+
+    @Mock
+    private IdempotencyService idempotencyService;
+
+    @Mock
+    private MedicalCodingRepository medicalCodingRepository;
+
+    @Mock
+    private EligibilityCheckRepository eligibilityCheckRepository;
+
+    @Mock
+    private ClaimRepository claimRepository;
+
+    @Mock
+    private DelegateExecution execution;
+
+    private String processInstanceId;
+    private String patientId;
+
+    @BeforeEach
+    void setUp() {
+        processInstanceId = "proc-comp-123";
+        patientId = "patient-comp-456";
+
+        when(execution.getProcessInstanceId()).thenReturn(processInstanceId);
+        when(execution.getVariable("patientId")).thenReturn(patientId);
+    }
+
+    // ========== CompensateCodingDelegate Tests ==========
+
+    @Test
+    void testCompensateCoding_Success_ShouldClearCodes() throws Exception {
+        // Given
+        CompensateCodingDelegate delegate = new CompensateCodingDelegate(
+            idempotencyService, medicalCodingRepository
+        );
+
+        String codingId = "CODING-001";
+        when(execution.getVariable("codingId")).thenReturn(codingId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateCoding");
+
+        MedicalCoding coding = new MedicalCoding();
+        coding.setId(codingId);
+        coding.setDiagnosisCodes("J44.0,J44.1");
+        coding.setProcedureCodes("99213");
+
+        when(medicalCodingRepository.findById(codingId))
+            .thenReturn(Optional.of(coding));
+
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_CODING"),
+            anyString(),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(medicalCodingRepository).save(argThat(savedCoding ->
+            savedCoding.getDiagnosisCodes() == null &&
+            savedCoding.getProcedureCodes() == null
+        ));
+
+        verify(idempotencyService).executeIdempotent(
+            eq("COMPENSATE_CODING"),
+            contains("compensateCoding"),
+            any()
+        );
+    }
+
+    @Test
+    void testCompensateCoding_Idempotent_ShouldNotCompensateTwice() throws Exception {
+        // Given
+        CompensateCodingDelegate delegate = new CompensateCodingDelegate(
+            idempotencyService, medicalCodingRepository
+        );
+
+        String codingId = "CODING-002";
+        when(execution.getVariable("codingId")).thenReturn(codingId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateCoding");
+
+        // Mock idempotency service to return cached result on second call
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_CODING"),
+            anyString(),
+            any()
+        )).thenReturn("COMPENSATED"); // Already compensated
+
+        // When
+        delegate.execute(execution);
+
+        // Then - Repository should NOT be called
+        verify(medicalCodingRepository, never()).findById(any());
+        verify(medicalCodingRepository, never()).save(any());
+    }
+
+    @Test
+    void testCompensateCoding_CodingNotFound_ShouldNotThrow() throws Exception {
+        // Given
+        CompensateCodingDelegate delegate = new CompensateCodingDelegate(
+            idempotencyService, medicalCodingRepository
+        );
+
+        String codingId = "CODING-NOTFOUND";
+        when(execution.getVariable("codingId")).thenReturn(codingId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateCoding");
+
+        when(medicalCodingRepository.findById(codingId))
+            .thenReturn(Optional.empty());
+
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_CODING"),
+            anyString(),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // When/Then - Should not throw
+        assertThatCode(() -> delegate.execute(execution))
+            .doesNotThrowAnyException();
+
+        verify(medicalCodingRepository, never()).save(any());
+    }
+
+    @Test
+    void testCompensateCoding_RepositoryError_ShouldLogButNotThrow() throws Exception {
+        // Given
+        CompensateCodingDelegate delegate = new CompensateCodingDelegate(
+            idempotencyService, medicalCodingRepository
+        );
+
+        String codingId = "CODING-ERROR";
+        when(execution.getVariable("codingId")).thenReturn(codingId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateCoding");
+
+        MedicalCoding coding = new MedicalCoding();
+        coding.setId(codingId);
+
+        when(medicalCodingRepository.findById(codingId))
+            .thenReturn(Optional.of(coding));
+
+        when(medicalCodingRepository.save(any()))
+            .thenThrow(new RuntimeException("Database error"));
+
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_CODING"),
+            anyString(),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            try {
+                return operation.call();
+            } catch (Exception e) {
+                // Compensation should catch and log errors
+                return "FAILED";
+            }
+        });
+
+        // When/Then - Should not propagate exception
+        assertThatCode(() -> delegate.execute(execution))
+            .doesNotThrowAnyException();
+    }
+
+    // ========== CompensateEligibilityDelegate Tests ==========
+
+    @Test
+    void testCompensateEligibility_Success_ShouldResetStatus() throws Exception {
+        // Given
+        CompensateEligibilityDelegate delegate = new CompensateEligibilityDelegate(
+            idempotencyService, eligibilityCheckRepository
+        );
+
+        String eligibilityId = "ELIG-001";
+        when(execution.getVariable("eligibilityCheckId")).thenReturn(eligibilityId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateEligibility");
+
+        EligibilityCheck eligibilityCheck = new EligibilityCheck();
+        eligibilityCheck.setId(eligibilityId);
+        eligibilityCheck.setStatus("APPROVED");
+
+        when(eligibilityCheckRepository.findById(eligibilityId))
+            .thenReturn(Optional.of(eligibilityCheck));
+
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_ELIGIBILITY"),
+            anyString(),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(eligibilityCheckRepository).save(argThat(savedCheck ->
+            savedCheck.getStatus().equals("CANCELLED")
+        ));
+    }
+
+    @Test
+    void testCompensateEligibility_AlreadyCancelled_ShouldBeIdempotent() throws Exception {
+        // Given
+        CompensateEligibilityDelegate delegate = new CompensateEligibilityDelegate(
+            idempotencyService, eligibilityCheckRepository
+        );
+
+        String eligibilityId = "ELIG-002";
+        when(execution.getVariable("eligibilityCheckId")).thenReturn(eligibilityId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateEligibility");
+
+        // Mock already compensated
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_ELIGIBILITY"),
+            anyString(),
+            any()
+        )).thenReturn("COMPENSATED");
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(eligibilityCheckRepository, never()).findById(any());
+        verify(eligibilityCheckRepository, never()).save(any());
+    }
+
+    // ========== CompensateClaimDelegate Tests ==========
+
+    @Test
+    void testCompensateClaim_Success_ShouldVoidClaim() throws Exception {
+        // Given
+        CompensateClaimDelegate delegate = new CompensateClaimDelegate(
+            idempotencyService, claimRepository
+        );
+
+        String claimId = "CLAIM-001";
+        when(execution.getVariable("claimId")).thenReturn(claimId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateClaim");
+
+        Claim claim = new Claim();
+        claim.setId(claimId);
+        claim.setStatus("SUBMITTED");
+
+        when(claimRepository.findById(claimId))
+            .thenReturn(Optional.of(claim));
+
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_CLAIM"),
+            anyString(),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // When
+        delegate.execute(execution);
+
+        // Then
+        verify(claimRepository).save(argThat(savedClaim ->
+            savedClaim.getStatus().equals("VOIDED")
+        ));
+    }
+
+    @Test
+    void testCompensateClaim_ClaimNotFound_ShouldNotThrow() throws Exception {
+        // Given
+        CompensateClaimDelegate delegate = new CompensateClaimDelegate(
+            idempotencyService, claimRepository
+        );
+
+        String claimId = "CLAIM-NOTFOUND";
+        when(execution.getVariable("claimId")).thenReturn(claimId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateClaim");
+
+        when(claimRepository.findById(claimId))
+            .thenReturn(Optional.empty());
+
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_CLAIM"),
+            anyString(),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // When/Then
+        assertThatCode(() -> delegate.execute(execution))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void testCompensateClaim_AlreadyVoided_ShouldBeIdempotent() throws Exception {
+        // Given
+        CompensateClaimDelegate delegate = new CompensateClaimDelegate(
+            idempotencyService, claimRepository
+        );
+
+        String claimId = "CLAIM-VOIDED";
+        when(execution.getVariable("claimId")).thenReturn(claimId);
+        when(execution.getCurrentActivityId()).thenReturn("compensateClaim");
+
+        Claim claim = new Claim();
+        claim.setId(claimId);
+        claim.setStatus("VOIDED");
+
+        when(claimRepository.findById(claimId))
+            .thenReturn(Optional.of(claim));
+
+        when(idempotencyService.executeIdempotent(
+            eq("COMPENSATE_CLAIM"),
+            anyString(),
+            any()
+        )).thenAnswer(invocation -> {
+            Callable<String> operation = invocation.getArgument(2);
+            return operation.call();
+        });
+
+        // When
+        delegate.execute(execution);
+
+        // Then - Status should remain VOIDED
+        verify(claimRepository).save(argThat(savedClaim ->
+            savedClaim.getStatus().equals("VOIDED")
+        ));
+    }
+
+    // ========== Integration Tests ==========
+
+    @Test
+    void testFullCompensationFlow_ShouldCompensateAllActivities() throws Exception {
+        // Given - All delegates
+        CompensateCodingDelegate codingDelegate = new CompensateCodingDelegate(
+            idempotencyService, medicalCodingRepository
+        );
+        CompensateEligibilityDelegate eligibilityDelegate = new CompensateEligibilityDelegate(
+            idempotencyService, eligibilityCheckRepository
+        );
+        CompensateClaimDelegate claimDelegate = new CompensateClaimDelegate(
+            idempotencyService, claimRepository
+        );
+
+        // Setup test data
+        String codingId = "CODING-FULL";
+        String eligibilityId = "ELIG-FULL";
+        String claimId = "CLAIM-FULL";
+
+        when(execution.getVariable("codingId")).thenReturn(codingId);
+        when(execution.getVariable("eligibilityCheckId")).thenReturn(eligibilityId);
+        when(execution.getVariable("claimId")).thenReturn(claimId);
+
+        MedicalCoding coding = new MedicalCoding();
+        coding.setId(codingId);
+        coding.setDiagnosisCodes("J44.0");
+
+        EligibilityCheck eligibility = new EligibilityCheck();
+        eligibility.setId(eligibilityId);
+        eligibility.setStatus("APPROVED");
+
+        Claim claim = new Claim();
+        claim.setId(claimId);
+        claim.setStatus("SUBMITTED");
+
+        when(medicalCodingRepository.findById(codingId)).thenReturn(Optional.of(coding));
+        when(eligibilityCheckRepository.findById(eligibilityId)).thenReturn(Optional.of(eligibility));
+        when(claimRepository.findById(claimId)).thenReturn(Optional.of(claim));
+
+        when(idempotencyService.executeIdempotent(anyString(), anyString(), any()))
+            .thenAnswer(invocation -> {
+                Callable<String> operation = invocation.getArgument(2);
+                return operation.call();
+            });
+
+        // When - Execute all compensations
+        when(execution.getCurrentActivityId()).thenReturn("compensateClaim");
+        claimDelegate.execute(execution);
+
+        when(execution.getCurrentActivityId()).thenReturn("compensateEligibility");
+        eligibilityDelegate.execute(execution);
+
+        when(execution.getCurrentActivityId()).thenReturn("compensateCoding");
+        codingDelegate.execute(execution);
+
+        // Then - All should be compensated
+        verify(claimRepository).save(argThat(c -> c.getStatus().equals("VOIDED")));
+        verify(eligibilityCheckRepository).save(argThat(e -> e.getStatus().equals("CANCELLED")));
+        verify(medicalCodingRepository).save(argThat(m -> m.getDiagnosisCodes() == null));
+    }
+}

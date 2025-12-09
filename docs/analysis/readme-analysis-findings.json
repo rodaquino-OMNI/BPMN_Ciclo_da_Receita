@@ -1,0 +1,478 @@
+{
+  "analysis_metadata": {
+    "file_analyzed": "README.md",
+    "analysis_timestamp": "2025-12-09T15:23:00Z",
+    "analyst_agent": "swarm-1765293733432-9bu3w1zhq",
+    "total_lines": 217,
+    "language": "English"
+  },
+  "document_structure": {
+    "sections": [
+      {
+        "level": 1,
+        "title": "BPMN Revenue Cycle - Hospital do Futuro",
+        "line": 1,
+        "type": "main_title"
+      },
+      {
+        "level": 2,
+        "title": "Comprehensive Documentation Index",
+        "line": 3,
+        "subsections": []
+      },
+      {
+        "level": 2,
+        "title": "Project Overview",
+        "line": 7,
+        "subsections": [
+          {"level": 3, "title": "Key Features", "line": 11},
+          {"level": 3, "title": "Architecture Highlights", "line": 22}
+        ]
+      },
+      {
+        "level": 2,
+        "title": "Documentation Structure",
+        "line": 30,
+        "subsections": [
+          {"level": 3, "title": "1. Process Documentation", "line": 32},
+          {"level": 3, "title": "2. API Documentation", "line": 48},
+          {"level": 3, "title": "3. DMN Decision Tables", "line": 57},
+          {"level": 3, "title": "4. Deployment Guide", "line": 67},
+          {"level": 3, "title": "5. Operations Manual", "line": 77},
+          {"level": 3, "title": "6. Training Materials", "line": 87},
+          {"level": 3, "title": "7. Security and Compliance", "line": 97},
+          {"level": 3, "title": "8. Data Dictionary", "line": 107},
+          {"level": 3, "title": "9. Architecture Documentation", "line": 116}
+        ]
+      },
+      {
+        "level": 2,
+        "title": "Quick Start",
+        "line": 125,
+        "subsections": [
+          {"level": 3, "title": "Prerequisites", "line": 127},
+          {"level": 3, "title": "Installation", "line": 136}
+        ]
+      },
+      {
+        "level": 2,
+        "title": "Key Metrics",
+        "line": 158,
+        "subsections": [
+          {"level": 3, "title": "Performance Targets", "line": 160},
+          {"level": 3, "title": "Business Outcomes", "line": 169}
+        ]
+      },
+      {
+        "level": 2,
+        "title": "Support and Maintenance",
+        "line": 178,
+        "subsections": [
+          {"level": 3, "title": "Contact Information", "line": 180},
+          {"level": 3, "title": "Contributing", "line": 186}
+        ]
+      },
+      {
+        "level": 2,
+        "title": "Version History",
+        "line": 194
+      },
+      {
+        "level": 2,
+        "title": "License",
+        "line": 200
+      },
+      {
+        "level": 2,
+        "title": "Acknowledgments",
+        "line": 206
+      }
+    ]
+  },
+  "file_paths_requiring_updates": {
+    "process_documentation": [
+      "./processes/00_Overview.md",
+      "./processes/01_Orchestrator.md",
+      "./processes/02_First_Contact.md",
+      "./processes/03_Pre_Authorization.md",
+      "./processes/04_Admission.md",
+      "./processes/05_Clinical_Production.md",
+      "./processes/06_Coding_Audit.md",
+      "./processes/07_Billing_Submission.md",
+      "./processes/08_Denials_Management.md",
+      "./processes/09_Revenue_Collection.md",
+      "./processes/10_Analytics.md",
+      "./processes/11_Maximization.md"
+    ],
+    "api_documentation": [
+      "./api/00_API_Overview.md",
+      "./api/01_Delegates.md",
+      "./api/02_Service_Tasks.md",
+      "./api/03_External_Services.md",
+      "./api/openapi.yaml"
+    ],
+    "dmn_documentation": [
+      "./dmn/00_DMN_Overview.md",
+      "./dmn/01_Eligibility_Rules.md",
+      "./dmn/02_Authorization_Rules.md",
+      "./dmn/03_Coding_Rules.md",
+      "./dmn/04_Billing_Rules.md",
+      "./dmn/05_Collection_Rules.md"
+    ],
+    "deployment_documentation": [
+      "./deployment/00_Overview.md",
+      "./deployment/01_Environment_Setup.md",
+      "./deployment/02_Camunda_Configuration.md",
+      "./deployment/03_Database_Setup.md",
+      "./deployment/04_Integration_Configuration.md",
+      "./deployment/05_Deployment_Checklist.md"
+    ],
+    "operations_documentation": [
+      "./operations/00_Overview.md",
+      "./operations/01_Monitoring.md",
+      "./operations/02_Troubleshooting.md",
+      "./operations/03_Performance_Tuning.md",
+      "./operations/04_Backup_Recovery.md",
+      "./operations/05_Incident_Response.md"
+    ],
+    "training_documentation": [
+      "./training/00_Overview.md",
+      "./training/01_Reception_User_Guide.md",
+      "./training/02_Authorization_User_Guide.md",
+      "./training/03_Billing_User_Guide.md",
+      "./training/04_Admin_Guide.md",
+      "./training/05_Video_Tutorials.md"
+    ],
+    "security_documentation": [
+      "./security/00_Overview.md",
+      "./security/01_Auth.md",
+      "./security/02_LGPD_Compliance.md",
+      "./security/03_Audit_Logs.md",
+      "./security/04_Encryption.md",
+      "./security/05_Compliance_Checklist.md"
+    ],
+    "data_documentation": [
+      "./data/00_Data_Dictionary.md",
+      "./data/01_Process_Variables.md",
+      "./data/02_Database_Schema.md",
+      "./data/03_Message_Formats.md",
+      "./data/04_TISS_Standards.md"
+    ],
+    "architecture_documentation": [
+      "./architecture/00_Overview.md",
+      "./architecture/01_System_Design.md",
+      "./architecture/02_Integration_Architecture.md",
+      "./architecture/03_Technology_Stack.md",
+      "./architecture/decisions/"
+    ],
+    "other_references": [
+      "../CONTRIBUTING.md",
+      "../LICENSE"
+    ],
+    "scripts": [
+      "./deploy-bpmn.sh",
+      "./deploy-delegates.sh",
+      "./configure-integrations.sh"
+    ]
+  },
+  "technical_terms_for_translation": {
+    "process_management": [
+      "BPMN (Business Process Model and Notation)",
+      "Revenue Cycle",
+      "Orchestrator",
+      "Subprocess",
+      "Workflow",
+      "Process Variables",
+      "Service Tasks",
+      "Delegates",
+      "Decision Tables (DMN)"
+    ],
+    "healthcare_specific": [
+      "Pre-Authorization",
+      "Clinical Production",
+      "Coding and Audit",
+      "Billing Submission",
+      "Denials Management",
+      "Revenue Collection",
+      "First Contact",
+      "Admission",
+      "TISS Standards (Troca de Informação em Saúde Suplementar)",
+      "TASY ERP System",
+      "Eligibility Verification"
+    ],
+    "technology_terms": [
+      "Microservices Architecture",
+      "Event-Driven",
+      "Cloud-Native",
+      "High Availability",
+      "Kubernetes",
+      "PostgreSQL",
+      "Docker",
+      "OpenAPI",
+      "RPA (Robotic Process Automation)",
+      "IoT/RFID",
+      "LLM (Large Language Model)",
+      "AI-Powered Automation",
+      "Real-time Analytics"
+    ],
+    "compliance_and_security": [
+      "LGPD (Lei Geral de Proteção de Dados)",
+      "HIPAA",
+      "End-to-end Encryption",
+      "Authentication and Authorization",
+      "Audit Logs",
+      "Compliance Checklist"
+    ],
+    "operations": [
+      "Monitoring",
+      "Troubleshooting",
+      "Performance Tuning",
+      "Backup and Recovery",
+      "Incident Response",
+      "Failover",
+      "System Availability"
+    ]
+  },
+  "translation_considerations": {
+    "keep_in_english": [
+      "BPMN",
+      "DMN",
+      "API",
+      "TISS",
+      "TASY",
+      "LGPD",
+      "HIPAA",
+      "RPA",
+      "IoT",
+      "RFID",
+      "LLM",
+      "AI",
+      "Docker",
+      "Kubernetes",
+      "PostgreSQL",
+      "OpenAPI"
+    ],
+    "translate_to_portuguese": [
+      "Revenue Cycle -> Ciclo da Receita",
+      "First Contact -> Primeiro Contato",
+      "Pre-Authorization -> Pré-Autorização",
+      "Admission -> Internação",
+      "Clinical Production -> Produção Assistencial",
+      "Coding and Audit -> Codificação e Auditoria",
+      "Billing Submission -> Faturamento",
+      "Denials Management -> Gestão de Glosas",
+      "Revenue Collection -> Recebimento",
+      "Analytics -> Análise",
+      "Maximization -> Maximização",
+      "Orchestrator -> Orquestrador",
+      "Workflow -> Fluxo de Trabalho"
+    ],
+    "context_dependent": [
+      "Process (Processo)",
+      "Task (Tarefa)",
+      "Service (Serviço)",
+      "Integration (Integração)",
+      "Deployment (Implantação)",
+      "Operations (Operações)",
+      "Training (Treinamento)",
+      "Security (Segurança)"
+    ]
+  },
+  "documentation_references": {
+    "internal_links_count": 64,
+    "external_references": [
+      "Camunda Community",
+      "IBM RPA",
+      "UiPath"
+    ],
+    "cross_references": [
+      "processes -> api",
+      "processes -> dmn",
+      "deployment -> operations",
+      "security -> compliance",
+      "data -> architecture"
+    ]
+  },
+  "installation_deployment_commands": [
+    {
+      "command": "git clone <repository-url>",
+      "purpose": "Clone repository",
+      "needs_update": true,
+      "line": 140
+    },
+    {
+      "command": "cd BPMN_Ciclo_da_Receita",
+      "purpose": "Navigate to project directory",
+      "needs_update": false,
+      "line": 141
+    },
+    {
+      "command": "./deploy-bpmn.sh",
+      "purpose": "Deploy BPMN files",
+      "needs_update": true,
+      "requires_script_creation": true,
+      "line": 144
+    },
+    {
+      "command": "./deploy-delegates.sh",
+      "purpose": "Deploy delegates",
+      "needs_update": true,
+      "requires_script_creation": true,
+      "line": 147
+    },
+    {
+      "command": "./configure-integrations.sh",
+      "purpose": "Configure integrations",
+      "needs_update": true,
+      "requires_script_creation": true,
+      "line": 150
+    },
+    {
+      "command": "docker-compose up -d",
+      "purpose": "Start services",
+      "needs_update": true,
+      "requires_file_creation": true,
+      "file_needed": "docker-compose.yml",
+      "line": 153
+    }
+  ],
+  "metrics_and_outcomes": {
+    "performance_targets": [
+      {
+        "metric": "First Contact to Appointment",
+        "target": "< 5 minutes",
+        "line": 162
+      },
+      {
+        "metric": "Pre-Authorization",
+        "target": "< 24 hours (48h max)",
+        "line": 163
+      },
+      {
+        "metric": "Billing Submission",
+        "target": "< 24 hours post-discharge",
+        "line": 164
+      },
+      {
+        "metric": "Denial Resolution",
+        "target": "< 7 days",
+        "line": 165
+      },
+      {
+        "metric": "Payment Reconciliation",
+        "target": "Daily automated",
+        "line": 166
+      },
+      {
+        "metric": "System Availability",
+        "target": "99.9%",
+        "line": 167
+      }
+    ],
+    "business_outcomes": [
+      {
+        "outcome": "Reduction in manual authorization time",
+        "value": "50%",
+        "line": 171
+      },
+      {
+        "outcome": "Automation of eligibility verification",
+        "value": "70%",
+        "line": 172
+      },
+      {
+        "outcome": "Accuracy in AI-powered coding",
+        "value": "90%",
+        "line": 173
+      },
+      {
+        "outcome": "Reduction in denials",
+        "value": "40%",
+        "line": 174
+      },
+      {
+        "outcome": "Faster appeal processing",
+        "value": "60%",
+        "line": 175
+      },
+      {
+        "outcome": "Financial dashboards",
+        "value": "Real-time",
+        "line": 176
+      }
+    ]
+  },
+  "links_and_references": {
+    "documentation_links": 64,
+    "broken_links_potential": 64,
+    "external_links": 0,
+    "email_contacts": [
+      "support@hospitalfuturo.com",
+      "docs@hospitalfuturo.com"
+    ],
+    "phone_contacts": [
+      "+55 11 1234-5678"
+    ]
+  },
+  "version_information": {
+    "current_version": "1.0.0",
+    "release_date": "2025-12-08",
+    "documentation_version": "1.0.0",
+    "system_version": "1.0.0",
+    "last_updated": "2025-12-08"
+  },
+  "prerequisites": {
+    "software": [
+      "Camunda Platform 7.20+",
+      "Java 17+",
+      "PostgreSQL 14+",
+      "Docker & Kubernetes",
+      "TASY ERP System",
+      "RPA Platform (IBM RPA or UiPath)"
+    ],
+    "updates_needed": [
+      "Verify Camunda version compatibility",
+      "Check Java version requirements",
+      "Confirm PostgreSQL minimum version",
+      "Update RPA platform alternatives"
+    ]
+  },
+  "action_items": {
+    "high_priority": [
+      "Update all 64 documentation file paths to point to actual files",
+      "Create missing deployment scripts (deploy-bpmn.sh, deploy-delegates.sh, configure-integrations.sh)",
+      "Create docker-compose.yml file",
+      "Update repository URL in git clone command",
+      "Translate key sections to Portuguese while keeping technical terms in English"
+    ],
+    "medium_priority": [
+      "Create all 64 referenced documentation files",
+      "Validate email and phone contact information",
+      "Add missing CONTRIBUTING.md and LICENSE files",
+      "Create architecture/decisions/ directory structure"
+    ],
+    "low_priority": [
+      "Add external links where appropriate",
+      "Create glossary for bilingual terminology",
+      "Add navigation aids for long document",
+      "Include screenshots or diagrams"
+    ]
+  },
+  "translation_strategy": {
+    "approach": "Hybrid bilingual documentation",
+    "principles": [
+      "Keep all technical acronyms in English (BPMN, API, DMN, etc.)",
+      "Translate business process names to Portuguese",
+      "Keep technology stack names in English",
+      "Provide glossary for key terms",
+      "Maintain consistency across all documentation"
+    ],
+    "recommended_structure": [
+      "Main title in Portuguese with English subtitle",
+      "Section headers in Portuguese",
+      "Technical terms in English with Portuguese explanation in parentheses on first use",
+      "Code blocks and commands remain in English",
+      "Metrics and business outcomes in Portuguese"
+    ]
+  }
+}

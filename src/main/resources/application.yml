@@ -1,0 +1,94 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /revenue-cycle
+
+spring:
+  application:
+    name: revenue-cycle-camunda
+
+  datasource:
+    url: jdbc:h2:mem:camunda;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: sa
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+# Camunda Configuration
+camunda:
+  bpm:
+    admin-user:
+      id: admin
+      password: admin
+      firstName: Admin
+      lastName: User
+
+    filter:
+      create: All tasks
+
+    authorization:
+      enabled: true
+
+    job-execution:
+      enabled: true
+      deployment-aware: true
+      core-pool-size: 3
+      max-pool-size: 10
+      queue-capacity: 10
+
+    history-level: full
+
+    auto-deployment-enabled: true
+    deployment-resource-pattern: classpath*:processes/**/*.bpmn,classpath*:dmn/**/*.dmn
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.hospital: DEBUG
+    org.camunda: INFO
+    org.springframework: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/revenue-cycle.log
+    max-size: 10MB
+    max-history: 30
+
+# Management Endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Application Info
+info:
+  app:
+    name: Hospital Revenue Cycle Management
+    description: BPMN-based Revenue Cycle with Camunda 7
+    version: 1.0.0
+    encoding: UTF-8
+    java:
+      version: 17

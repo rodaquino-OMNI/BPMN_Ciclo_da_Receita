@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/"
+             xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/"
+             xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/"
+             xmlns:camunda="http://camunda.org/schema/1.0/dmn"
+             id="collection-workflow-dmn"
+             name="Collection Workflow Rules"
+             namespace="http://camunda.org/schema/1.0/dmn">
+
+  <decision id="determineCollectionAction" name="Determine Collection Action" camunda:historyTimeToLive="P180D">
+    <decisionTable id="collectionWorkflowTable" hitPolicy="FIRST">
+      <input id="input1" label="Days Overdue">
+        <inputExpression id="inputExpression1" typeRef="number">
+          <text>daysOverdue</text>
+        </inputExpression>
+      </input>
+      <input id="input2" label="Outstanding Amount">
+        <inputExpression id="inputExpression2" typeRef="number">
+          <text>outstandingAmount</text>
+        </inputExpression>
+      </input>
+      <input id="input3" label="Payment History">
+        <inputExpression id="inputExpression3" typeRef="string">
+          <text>paymentHistory</text>
+        </inputExpression>
+      </input>
+      <input id="input4" label="Previous Contact Attempts">
+        <inputExpression id="inputExpression4" typeRef="number">
+          <text>previousContactAttempts</text>
+        </inputExpression>
+      </input>
+      <input id="input5" label="Patient Financial Status">
+        <inputExpression id="inputExpression5" typeRef="string">
+          <text>patientFinancialStatus</text>
+        </inputExpression>
+      </input>
+      <input id="input6" label="Payment Plan Active">
+        <inputExpression id="inputExpression6" typeRef="boolean">
+          <text>paymentPlanActive</text>
+        </inputExpression>
+      </input>
+
+      <output id="output1" label="Collection Action" name="collectionAction" typeRef="string" />
+      <output id="output2" label="Communication Channel" name="communicationChannel" typeRef="string" />
+      <output id="output3" label="Priority Level" name="priorityLevel" typeRef="string" />
+      <output id="output4" label="Next Contact Days" name="nextContactDays" typeRef="number" />
+      <output id="output5" label="Escalation Required" name="escalationRequired" typeRef="boolean" />
+
+      <!-- Rule 1: 0-15 days overdue, first reminder -->
+      <rule id="rule1">
+        <inputEntry id="inputEntry1_1">
+          <text>[1..15]</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_4">
+          <text>0</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry1_6">
+          <text>-</text>
+        </inputEntry>
+        <outputEntry id="outputEntry1_1">
+          <text>"FRIENDLY_REMINDER"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_2">
+          <text>"EMAIL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_3">
+          <text>"LOW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_4">
+          <text>7</text>
+        </outputEntry>
+        <outputEntry id="outputEntry1_5">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 2: 16-30 days overdue, second reminder -->
+      <rule id="rule2">
+        <inputEntry id="inputEntry2_1">
+          <text>[16..30]</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_3">
+          <text>"GOOD","AVERAGE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_4">
+          <text>&lt; 3</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry2_6">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry2_1">
+          <text>"PAYMENT_REMINDER"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_2">
+          <text>"EMAIL_AND_SMS"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_3">
+          <text>"MEDIUM"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_4">
+          <text>5</text>
+        </outputEntry>
+        <outputEntry id="outputEntry2_5">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 3: 31-60 days overdue, phone contact required -->
+      <rule id="rule3">
+        <inputEntry id="inputEntry3_1">
+          <text>[31..60]</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_2">
+          <text>&gt; 1000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_4">
+          <text>&lt; 5</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry3_6">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry3_1">
+          <text>"PHONE_CONTACT"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_2">
+          <text>"PHONE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_3">
+          <text>"HIGH"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_4">
+          <text>3</text>
+        </outputEntry>
+        <outputEntry id="outputEntry3_5">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 4: 31-60 days, payment plan offer -->
+      <rule id="rule4">
+        <inputEntry id="inputEntry4_1">
+          <text>[31..60]</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_2">
+          <text>&gt; 5000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_5">
+          <text>"POOR","HARDSHIP"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry4_6">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry4_1">
+          <text>"OFFER_PAYMENT_PLAN"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_2">
+          <text>"PHONE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_3">
+          <text>"HIGH"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_4">
+          <text>7</text>
+        </outputEntry>
+        <outputEntry id="outputEntry4_5">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 5: 61-90 days overdue, final notice -->
+      <rule id="rule5">
+        <inputEntry id="inputEntry5_1">
+          <text>[61..90]</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_3">
+          <text>"POOR","AVERAGE"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_4">
+          <text>&gt;= 3</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry5_6">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry5_1">
+          <text>"FINAL_NOTICE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_2">
+          <text>"REGISTERED_MAIL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_3">
+          <text>"CRITICAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_4">
+          <text>10</text>
+        </outputEntry>
+        <outputEntry id="outputEntry5_5">
+          <text>true</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 6: 91-120 days overdue, pre-legal -->
+      <rule id="rule6">
+        <inputEntry id="inputEntry6_1">
+          <text>[91..120]</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_2">
+          <text>&gt; 2000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_3">
+          <text>"POOR"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry6_6">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry6_1">
+          <text>"PRE_LEGAL_NOTICE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_2">
+          <text>"REGISTERED_MAIL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_3">
+          <text>"CRITICAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_4">
+          <text>15</text>
+        </outputEntry>
+        <outputEntry id="outputEntry6_5">
+          <text>true</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 7: Over 120 days, legal action -->
+      <rule id="rule7">
+        <inputEntry id="inputEntry7_1">
+          <text>&gt; 120</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_2">
+          <text>&gt; 3000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry7_6">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry7_1">
+          <text>"LEGAL_ACTION"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_2">
+          <text>"LEGAL_DEPARTMENT"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_3">
+          <text>"CRITICAL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_4">
+          <text>30</text>
+        </outputEntry>
+        <outputEntry id="outputEntry7_5">
+          <text>true</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 8: Payment plan active and compliant -->
+      <rule id="rule8">
+        <inputEntry id="inputEntry8_1">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_2">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry8_6">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="outputEntry8_1">
+          <text>"MONITOR_PLAN"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_2">
+          <text>"EMAIL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_3">
+          <text>"LOW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_4">
+          <text>30</text>
+        </outputEntry>
+        <outputEntry id="outputEntry8_5">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 9: High-value account, good history -->
+      <rule id="rule9">
+        <inputEntry id="inputEntry9_1">
+          <text>[16..45]</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_2">
+          <text>&gt; 15000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_3">
+          <text>"EXCELLENT","GOOD"</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_4">
+          <text>&lt; 2</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry9_6">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry9_1">
+          <text>"COURTESY_CALL"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry9_2">
+          <text>"PHONE"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry9_3">
+          <text>"HIGH"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry9_4">
+          <text>7</text>
+        </outputEntry>
+        <outputEntry id="outputEntry9_5">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+
+      <!-- Rule 10: Low-value account, long overdue -->
+      <rule id="rule10">
+        <inputEntry id="inputEntry10_1">
+          <text>&gt; 180</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_2">
+          <text>&lt; 1000</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_3">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_4">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_5">
+          <text>-</text>
+        </inputEntry>
+        <inputEntry id="inputEntry10_6">
+          <text>false</text>
+        </inputEntry>
+        <outputEntry id="outputEntry10_1">
+          <text>"WRITE_OFF_CONSIDERATION"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry10_2">
+          <text>"INTERNAL_REVIEW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry10_3">
+          <text>"LOW"</text>
+        </outputEntry>
+        <outputEntry id="outputEntry10_4">
+          <text>90</text>
+        </outputEntry>
+        <outputEntry id="outputEntry10_5">
+          <text>false</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

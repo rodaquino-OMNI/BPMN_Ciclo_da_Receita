@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/revenue_cycle}
+    driver-class-name: org.postgresql.Driver
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+camunda:
+  bpm:
+    authorization:
+      enabled: true
+    job-execution:
+      core-pool-size: 5
+      max-pool-size: 20
+
+logging:
+  level:
+    root: WARN
+    com.hospital: INFO
+    org.camunda: WARN

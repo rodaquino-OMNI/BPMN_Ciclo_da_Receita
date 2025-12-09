@@ -1,0 +1,17 @@
+spring:
+  h2:
+    console:
+      enabled: true
+  jpa:
+    show-sql: true
+
+camunda:
+  bpm:
+    admin-user:
+      id: dev
+      password: dev
+
+logging:
+  level:
+    com.hospital: DEBUG
+    org.camunda: DEBUG

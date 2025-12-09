@@ -32,6 +32,8 @@ claude-flow.config.json
 .swarm/
 .hive-mind/
 .claude-flow/
+.claude 
+archive
 memory/
 coordination/
 memory/claude-flow-data.json

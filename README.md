@@ -1,12 +1,10 @@
-# BPMN Ciclo da Receita - Hospital do Futuro
-
-## Índice Abrangente de Documentação
+# Ciclo da Receita - Hospital do Futuro
 
 Bem-vindo à documentação completa da implementação BPMN do Ciclo de Receita Hospitalar. Esta documentação cobre todos os aspectos do sistema, desde arquitetura até operações.
 
-## Visão Geral do Projeto
+## Visão Geral
 
-O projeto **BPMN Ciclo da Receita Hospitalar** é uma implementação completa e de nível empresarial para gestão do ciclo de receita hospitalar utilizando BPMN 2.0 e Camunda Platform 7. O sistema orquestra 10 etapas críticas do ciclo de receita através de workflows automatizados, tomada de decisão baseada em IA e integrações inteligentes.
+O **BPMN Ciclo da Receita Hospitalar** é uma solução completa e de nível enterprise para gestão do ciclo de receita hospitalar utilizando BPMN 2.0 e Camunda Platform 7. O sistema orquestra 10 etapas críticas do ciclo de receita através de workflows automatizados, tomada de decisão baseada em IA e integrações inteligentes.
 
 ### Principais Funcionalidades
 
